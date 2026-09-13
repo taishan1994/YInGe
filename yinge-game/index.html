@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音格 · 拼音拼词棋</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+/* ===== 设计令牌 ===== */
+:root{
+  --board-bg:#1c201b;      /* 桌面：深墨绿黑 */
+  --board-bg-2:#232821;
+  --panel:#f4edda;         /* 宣纸 */
+  --panel-2:#efe5c9;
+  --panel-3:#e7dabc;
+  --ink:#2a2722;           /* 墨色 */
+  --ink-soft:#6b6455;
+  --line:#b9ad8f;
+  --jade:#4e7a68;          /* 竹青：韵母 */
+  --cerulean:#3f6283;      /* 青瓷：声母 */
+  --grape:#7a5a7e;         /* 绛紫：整体认读 */
+  --gold:#c9a227;          /* 鎏金：万能 */
+  --cinnabar:#b03a2e;      /* 朱砂：强调 / 印章 */
+  --cinnabar-soft:#d97c66;
+  --dl:#cfe0db;            /* 双字 */
+  --tl:#9cc3b5;            /* 三字 */
+  --dw:#e8cfb8;            /* 双词 */
+  --tw:#c96a4a;            /* 三词 */
+  --star:#d9b45b;          /* 中心星格 */
+  --serif:"Noto Serif SC","Songti SC","SimSun",serif;
+  --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --shadow:0 12px 40px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);
+  color:var(--panel);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(78,122,104,.18), transparent 60%),
+    radial-gradient(900px 500px at 110% 20%, rgba(191,58,46,.10), transparent 55%),
+    var(--board-bg);
+  min-height:100%;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+[hidden]{display:none !important}
+
+/* ===== 通用控件 ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;padding:0 18px;border-radius:10px;
+  font-size:15px;font-weight:600;letter-spacing:.04em;
+  border:1px solid transparent;transition:transform .08s ease,background .15s ease;
+  user-select:none;-webkit-user-select:none;
+}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--cinnabar);color:#fff;box-shadow:0 4px 14px rgba(176,58,46,.35)}
+.btn-primary:hover{background:#c04437}
+.btn-ghost{background:transparent;border-color:rgba(244,237,218,.35);color:var(--panel)}
+.btn-ghost:hover{background:rgba(244,237,218,.08)}
+.btn-ink{background:var(--ink);color:var(--panel)}
+.btn-ink:hover{background:#3a352d}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* ===== 顶部栏 ===== */
+.topbar{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 22px;max-width:1320px;margin:0 auto;
+  border-bottom:1px solid rgba(244,237,218,.12);
+}
+.logo-seal{
+  width:44px;height:44px;flex:none;border-radius:9px;
+  background:var(--cinnabar);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-weight:900;font-size:24px;
+  box-shadow:0 3px 10px rgba(176,58,46,.4);
+}
+.brand-name{font-family:var(--serif);font-weight:900;font-size:22px;letter-spacing:.12em}
+.brand-sub{font-size:11px;color:rgba(244,237,218,.55);letter-spacing:.3em;margin-top:2px}
+.topbar-spacer{flex:1}
+.turn-indicator{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 16px;border-radius:999px;
+  background:rgba(244,237,218,.06);border:1px solid rgba(244,237,218,.16);
+  font-size:14px;
+}
+.turn-dot{width:10px;height:10px;border-radius:50%;background:var(--cinnabar-soft)}
+.turn-dot.active{background:var(--gold);box-shadow:0 0 0 3px rgba(201,162,39,.25);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ===== 主布局 ===== */
+.game-wrap{max-width:1320px;margin:0 auto;padding:20px 22px 40px;display:flex;gap:22px;align-items:flex-start}
+.board-zone{flex:1;min-width:0}
+.side-zone{width:348px;flex:none;display:flex;flex-direction:column;gap:14px}
+
+/* ===== 左侧：已选字词面板 ===== */
+.word-zone{width:208px;flex:none;display:flex;flex-direction:column;gap:14px}
+.word-zone .card{max-height:calc(100vh - 120px);display:flex;flex-direction:column}
+.word-zone .word-panel{min-height:0;overflow-y:auto;padding-right:4px;scrollbar-width:thin}
+.wp-sec-title{font-size:12px;color:var(--ink-soft);font-weight:700;letter-spacing:.08em;margin:12px 0 8px}
+.wp-sec-title:first-child{margin-top:0}
+.wp-chars{display:flex;flex-wrap:wrap;gap:6px}
+.wp-char{
+  width:42px;height:42px;border-radius:7px;background:var(--panel-2);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:1px;font-family:var(--serif);font-weight:700;font-size:17px;
+}
+.wp-char-py{font-family:var(--sans);font-size:10px;line-height:11px;color:var(--ink-soft);font-weight:600}
+.wp-word{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--panel-2);margin-bottom:6px;font-size:14px}
+.wp-word-txt{font-family:var(--serif);font-weight:700;flex:1}
+.wp-word-pts{font-size:12px;color:var(--ink-soft);flex:none}
+.wp-empty{font-size:12px;color:var(--ink-soft)}
+
+/* ===== 棋盘 ===== */
+.board-frame{
+  background:linear-gradient(160deg,var(--board-bg-2),var(--board-bg));
+  border:1px solid rgba(244,237,218,.14);
+  border-radius:16px;padding:16px;
+  box-shadow:var(--shadow);
+}
+.board-grid{
+  display:grid;
+  grid-template-columns:repeat(15,1fr);
+  grid-template-rows:repeat(15,1fr);
+  gap:3px;
+  aspect-ratio:1/1;
+  max-width:660px;margin:0 auto;
+}
+.cell{
+  position:relative;border-radius:5px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:0;overflow:hidden;
+  font-family:var(--sans);
+  cursor:pointer;user-select:none;-webkit-user-select:none;
+  touch-action:none;
+  transition:transform .06s ease,filter .1s ease;
+}
+.cell:hover{filter:brightness(1.08)}
+.cell.empty{background:var(--panel-3)}
+.cell.bonus-dl{background:var(--dl);color:#3a5f52}
+.cell.bonus-tl{background:var(--tl);color:#2b4a3e}
+.cell.bonus-dw{background:var(--dw);color:#8a5a3a}
+.cell.bonus-tw{background:var(--tw);color:#fff}
+.cell.bonus-star{background:var(--star);color:#6b4d10}
+.cell .bonus-label{
+  font-size:clamp(7px,1.1vw,11px);font-weight:700;letter-spacing:.02em;
+  writing-mode:vertical-rl;
+}
+.cell .bonus-double{font-size:clamp(8px,1.2vw,12px);font-weight:900}
+.cell.hint-ok{outline:2px solid rgba(201,162,39,.85);outline-offset:-2px}
+.cell.best-hint{outline:3px solid #fff3a6;outline-offset:-3px;box-shadow:0 0 0 4px rgba(201,162,39,.65),0 0 18px rgba(201,162,39,.8);z-index:2}
+.cell.occupied{background:var(--ink);box-shadow:inset 0 0 0 1px rgba(244,237,218,.18)}
+.cell .tile{
+  width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#fff;border-radius:5px;
+}
+.cell .tile .py{
+  font-size:clamp(10px,1.5vw,17px);font-weight:700;line-height:1.05;
+  font-family:var(--sans);
+}
+.cell .tile .han{
+  font-size:clamp(9px,1.35vw,15px);line-height:1.1;margin-top:1px;
+  font-family:var(--serif);font-weight:900;color:#f5cfc4;
+}
+.cell .tile .type-tag{
+  font-size:clamp(6px,.8vw,8px);opacity:.75;margin-top:1px;letter-spacing:.05em;
+}
+.cell .tile-sm{background:var(--cerulean)}
+.cell .tile-ym{background:var(--jade)}
+.cell .tile-zt{background:var(--grape)}
+.cell .tile-wild{background:var(--gold);color:#3a2f06}
+.cell .tile-new{box-shadow:0 0 0 2px rgba(201,162,39,.9),0 4px 10px rgba(0,0,0,.4)}
+.cell.newly{animation:pop .25s ease}
+@keyframes pop{0%{transform:scale(.75);opacity:.4}100%{transform:scale(1);opacity:1}}
+.cell.sealed{animation:stamp .45s ease}
+@keyframes stamp{
+  0%{transform:scale(1.25);filter:brightness(1.6)}
+  60%{transform:scale(.95)}
+  100%{transform:scale(1);filter:brightness(1)}
+}
+
+/* 棋盘坐标 */
+.board-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;color:rgba(244,237,218,.5);font-size:12px;letter-spacing:.08em}
+.board-meta span:last-child{flex:1;text-align:right}
+
+/* ===== 侧栏卡片 ===== */
+.card{
+  background:var(--panel);color:var(--ink);
+  border-radius:14px;padding:16px;
+  box-shadow:var(--shadow);
+}
+.card-title{
+  font-family:var(--serif);font-weight:700;font-size:15px;
+  letter-spacing:.14em;color:var(--ink);
+  display:flex;align-items:center;gap:8px;margin-bottom:12px;
+}
+.card-title::before{
+  content:"";width:4px;height:16px;border-radius:2px;background:var(--cinnabar);
+}
+/* 玩家分数 */
+.players{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.player-card{
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  background:var(--panel-2);transition:all .15s ease;
+}
+.player-card.current{border-color:var(--cinnabar);background:#f6e4dc;box-shadow:0 0 0 1px var(--cinnabar)}
+.player-name{font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.player-name .you{color:var(--cinnabar);font-size:11px;letter-spacing:.1em}
+.player-score{font-family:var(--serif);font-weight:900;font-size:22px;margin-top:4px;font-variant-numeric:tabular-nums}
+.player-score small{font-size:11px;font-weight:400;color:var(--ink-soft);margin-left:4px}
+
+/* 手牌 */
+.hand{
+  min-height:120px;
+  display:flex;flex-wrap:wrap;gap:8px;
+  padding:10px;border-radius:12px;
+  background:var(--panel-3);border:1px dashed var(--line);
+}
+.hand-tile{
+  width:58px;height:76px;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:#fff;position:relative;
+  box-shadow:0 3px 8px rgba(0,0,0,.25);
+  cursor:pointer;user-select:none;-webkit-user-select:none;
+  transition:transform .1s ease,box-shadow .1s ease;
+  touch-action:none;
+}
+.hand-tile:hover{transform:translateY(-4px)}
+.hand-tile.selected{transform:translateY(-10px);box-shadow:0 10px 18px rgba(0,0,0,.35),0 0 0 2px var(--gold)}
+.hand-tile .py{font-size:19px;font-weight:800;line-height:1}
+.hand-tile .type-tag{font-size:9px;opacity:.8;letter-spacing:.05em}
+.hand-tile .pt{
+  position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;
+  background:var(--ink);color:var(--panel);font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 5px rgba(0,0,0,.3);
+}
+.hand-tile.sm{background:var(--cerulean)}
+.hand-tile.ym{background:var(--jade)}
+.hand-tile.zt{background:var(--grape)}
+.hand-tile.wild{background:var(--gold);color:#3a2f06}
+.hand-empty{color:var(--ink-soft);font-size:13px;padding:20px 0;text-align:center;width:100%}
+
+/* 操作按钮 */
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions .btn{width:100%}
+.actions .span2{grid-column:1 / -1}
+
+/* 开关 */
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--ink)}
+.switch{position:relative;width:46px;height:26px;flex:none;cursor:pointer}
+.switch input{opacity:0;width:0;height:0}
+.switch .track{
+  position:absolute;inset:0;border-radius:999px;background:#c8bfa9;transition:background .15s;
+}
+.switch .track::after{
+  content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.switch input:checked + .track{background:var(--cinnabar)}
+.switch input:checked + .track::after{transform:translateX(20px)}
+
+/* 日志 */
+.log{max-height:170px;overflow-y:auto;font-size:12.5px;line-height:1.7;color:var(--ink)}
+.log .log-item{border-bottom:1px dashed var(--line);padding:5px 2px;display:flex;gap:8px;align-items:baseline}
+.log .log-turn{color:var(--cinnabar);font-weight:700;flex:none}
+.log .log-word{font-family:var(--serif);font-weight:900}
+.log .log-points{margin-left:auto;color:var(--ink-soft);flex:none}
+.log .log-empty{color:var(--ink-soft);font-size:13px}
+
+/* ===== 首页 ===== */
+.start-wrap{
+  max-width:880px;margin:0 auto;padding:70px 22px 60px;
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+}
+.start-seal{
+  width:96px;height:96px;border-radius:18px;
+  background:var(--cinnabar);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-weight:900;font-size:52px;
+  box-shadow:0 10px 30px rgba(176,58,46,.45);
+  margin-bottom:26px;
+  animation:seal-in .6s ease;
+}
+@keyframes seal-in{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+.start-title{
+  font-family:var(--serif);font-weight:900;font-size:56px;letter-spacing:.2em;
+  text-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+.start-sub{font-size:15px;color:rgba(244,237,218,.6);letter-spacing:.4em;margin-top:10px}
+.start-desc{font-size:14px;line-height:1.9;color:rgba(244,237,218,.78);margin:26px 0 6px;max-width:600px}
+.start-desc b{color:var(--cinnabar-soft);font-weight:600}
+.player-setup{
+  width:100%;max-width:640px;background:rgba(244,237,218,.05);
+  border:1px solid rgba(244,237,218,.14);border-radius:16px;
+  padding:22px 26px;margin-top:24px;
+}
+.setup-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.setup-label{font-size:14px;color:rgba(244,237,218,.75);flex:none;letter-spacing:.1em}
+.count-btns{display:flex;gap:8px}
+.count-btn{
+  width:52px;height:44px;border-radius:9px;font-size:16px;font-weight:700;
+  border:1px solid rgba(244,237,218,.25);color:var(--panel);
+  transition:all .12s;
+}
+.count-btn:hover{border-color:var(--gold)}
+.count-btn.on{background:var(--cinnabar);border-color:var(--cinnabar);color:#fff}
+    .name-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .ai-option{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 0;color:var(--ink-soft);font-size:13px;cursor:pointer}
+    .ai-option input{accent-color:var(--cinnabar);width:16px;height:16px}
+.name-inputs .name-field{display:flex;flex-direction:column;gap:4px;text-align:left}
+.name-field label{font-size:11px;color:rgba(244,237,218,.6);letter-spacing:.12em}
+.name-field input{
+  height:44px;border-radius:9px;border:1px solid rgba(244,237,218,.2);
+  background:rgba(0,0,0,.25);color:var(--panel);padding:0 14px;font-size:14px;
+  outline:none;transition:border .15s;
+}
+.name-field input:focus{border-color:var(--gold)}
+.start-btn{
+  margin-top:26px;min-width:220px;min-height:52px;font-size:17px;
+  background:var(--cinnabar);color:#fff;border-radius:12px;
+  box-shadow:0 8px 24px rgba(176,58,46,.4);
+}
+.start-btn:hover{background:#c04437}
+.rules-teaser{font-size:12px;color:rgba(244,237,218,.45);margin-top:20px;max-width:560px;line-height:1.8}
+
+/* ===== 弹窗 ===== */
+.modal-mask{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(12,14,11,.72);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal{
+  background:var(--panel);color:var(--ink);border-radius:16px;
+  max-width:560px;width:100%;max-height:86vh;overflow-y:auto;
+  padding:26px 28px;box-shadow:var(--shadow);
+  animation:modal-in .22s ease;
+}
+@keyframes modal-in{0%{transform:translateY(14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+.modal h2{
+  font-family:var(--serif);font-weight:900;font-size:21px;letter-spacing:.1em;
+  margin-bottom:4px;
+}
+.modal .sub{font-size:13px;color:var(--ink-soft);margin-bottom:18px}
+.syl-block{
+  border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;
+  background:var(--panel-2);
+}
+.syl-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.syl-pinyin{
+  font-family:var(--serif);font-weight:900;font-size:20px;color:var(--cerulean);
+  background:#e4e9ef;border-radius:8px;padding:4px 12px;
+}
+.syl-wild-tip{font-size:12px;color:var(--ink-soft)}
+.wild-pick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.mini-btn{
+  padding:6px 12px;border-radius:7px;font-size:13px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink);min-height:34px;
+}
+.mini-btn:hover{border-color:var(--cerulean)}
+.mini-btn.on{background:var(--cerulean);color:#fff;border-color:var(--cerulean)}
+.char-options{display:flex;flex-wrap:wrap;gap:8px}
+.char-opt{
+  min-width:48px;height:48px;border-radius:9px;font-size:20px;font-family:var(--serif);font-weight:700;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .12s;
+}
+.char-opt:hover{border-color:var(--cinnabar);color:var(--cinnabar)}
+.char-opt.on{background:var(--cinnabar);border-color:var(--cinnabar);color:#fff;box-shadow:0 3px 10px rgba(176,58,46,.35)}
+.char-opt:disabled{opacity:.35;cursor:default}
+.syl-words{font-size:12px;color:var(--ink-soft);margin-top:8px;letter-spacing:.05em}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-actions .btn{flex:1}
+.toast-mask{
+  position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:80;
+}
+.toast{
+  background:var(--ink);color:var(--panel);border-radius:999px;padding:11px 22px;
+  font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4);
+  border:1px solid rgba(244,237,218,.2);
+  animation:toast-in .2s ease;
+}
+@keyframes toast-in{0%{transform:translateY(-12px);opacity:0}100%{transform:translateY(0);opacity:1}}
+.word-check-list{margin:10px 0 6px}
+.word-check-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--panel-2);margin-bottom:6px;font-size:14px}
+.word-check-item.ok{background:#e0ece3}
+.word-check-item.bad{background:#f4ddd8}
+.word-check-item .mark{font-weight:900;flex:none}
+.word-check-item .mark.ok{color:#2e7d4f}
+.word-check-item .mark.bad{color:var(--cinnabar)}
+.score-gain{font-family:var(--serif);font-weight:900;font-size:26px;color:var(--cinnabar);text-align:center;margin:14px 0 4px}
+.end-title{text-align:center;font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.14em;margin-bottom:6px}
+.end-sub{text-align:center;color:var(--ink-soft);font-size:13px;margin-bottom:18px}
+.end-podium{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.end-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
+.end-row.win{background:#f6e4dc;border-color:var(--cinnabar)}
+.end-rank{font-family:var(--serif);font-weight:900;font-size:18px;width:30px;flex:none;color:var(--cinnabar)}
+.end-name{font-weight:700;flex:1}
+.end-score{font-family:var(--serif);font-weight:900;font-size:20px}
+.end-best{text-align:center;font-size:13px;color:var(--ink-soft);margin-bottom:16px}
+.rules-text{font-size:13.5px;line-height:1.85;color:var(--ink)}
+.rules-text h3{font-family:var(--serif);font-size:15px;margin:14px 0 6px;color:var(--cinnabar)}
+.rules-text p{margin-bottom:8px}
+.rules-text .tag{
+  display:inline-block;font-size:11px;font-weight:700;color:#fff;border-radius:5px;padding:1px 7px;margin-right:4px;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width:1020px){
+  .game-wrap{flex-direction:column;align-items:stretch}
+  .word-zone{width:100%;flex-direction:row;flex-wrap:wrap}
+  .word-zone .card{flex:1 1 240px}
+  .word-zone .word-panel{max-height:280px}
+  .side-zone{width:100%}
+  .board-grid{max-width:560px}
+}
+@media (max-width:640px){
+  .topbar{padding:12px 14px}
+  .turn-indicator{font-size:12px;padding:6px 10px}
+  .game-wrap{padding:14px 12px 30px}
+  .board-frame{padding:10px}
+  .board-grid{gap:2px}
+  .board-meta span:last-child{flex-basis:100%;text-align:left}
+  .start-title{font-size:40px}
+  .hand-tile{width:52px;height:70px}
+  .name-inputs{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 顶部栏 ========== -->
+<header class="topbar" id="topbar" hidden>
+  <div class="logo-seal">音</div>
+  <div>
+    <div class="brand-name">音格</div>
+    <div class="brand-sub">拼音拼词棋</div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="turn-indicator" id="turnIndicator">
+    <span class="turn-dot" id="turnDot"></span>
+    <span id="turnText">轮到：玩家一</span>
+  </div>
+  <button class="btn btn-ghost" id="btnRulesTop" style="min-height:40px">规则</button>
+  <button class="btn btn-ghost" id="btnHomeTop" style="min-height:40px">首页</button>
+</header>
+
+<!-- ========== 首页 ========== -->
+<section class="start-wrap" id="viewStart">
+  <div class="start-seal">音</div>
+  <div class="start-title">音 格</div>
+  <div class="start-sub">拼 音 · 组 词 · 落 子 得 分</div>
+  <p class="start-desc">
+    一款在方格棋盘上拼<b>拼音音节</b>、<b>选定汉字</b>、连成<b>词语</b>的多人桌游。
+    声母、韵母、整体认读与万能牌轮番上阵，踩中双倍三倍格，一词多词叠加得分。
+    多音字？拼音说了算——拼出什么读音，就只能认那个读音的字。
+  </p>
+  <div class="player-setup">
+    <div class="setup-row">
+      <span class="setup-label">玩家人数</span>
+      <div class="count-btns" id="countBtns">
+        <button class="count-btn" data-n="2">2人</button>
+        <button class="count-btn on" data-n="3">3人</button>
+        <button class="count-btn" data-n="4">4人</button>
+      </div>
+    </div>
+    <div class="name-inputs" id="nameInputs"></div>
+    <label class="ai-option" id="aiOption" hidden><input type="checkbox" id="aiMode"> 玩家 1 对战电脑</label>
+    <button class="btn start-btn" id="btnStart">开始对局</button>
+    <button class="btn btn-ghost" id="btnResume" hidden style="margin-top:10px;width:100%;border-color:var(--line)">继续上局</button>
+    <p id="bankStatus" style="margin:10px 0 0;text-align:center;color:var(--muted);font-size:12px" aria-live="polite">词库准备中…</p>
+  </div>
+  <p class="rules-teaser">每轮出牌拼出音节并选定汉字组成词语；词语需与棋盘已有字相连。字分按牌面计，踩格翻倍；一次横纵同时成词可累计得分。手牌清空加 20 分。</p>
+</section>
+
+<!-- ========== 游戏主界面 ========== -->
+<section id="viewGame" hidden>
+  <div class="game-wrap">
+    <!-- 左侧：已选字词 -->
+    <div class="word-zone">
+      <div class="card">
+        <div class="card-title">已选字词</div>
+        <div class="word-panel" id="wordPanel"></div>
+      </div>
+    </div>
+
+    <!-- 棋盘区 -->
+    <div class="board-zone">
+      <div class="board-frame">
+        <div class="board-grid" id="boardGrid" role="grid" aria-label="15乘15拼音棋盘"></div>
+      </div>
+      <div class="board-meta">
+        <span>15 × 15 字盘 · 牌池剩余 <b id="bagCount">0</b> 张</span>
+        <span>连续无得分 <b id="skipCount">0</b>/<b id="skipLimit">0</b></span>
+        <span id="boardHint" aria-live="polite" aria-atomic="true">选一张手牌，再点棋盘空格落子；落完点「确认成词」</span>
+      </div>
+    </div>
+
+    <!-- 侧栏 -->
+    <div class="side-zone">
+      <div class="card">
+        <div class="card-title">对局</div>
+        <div class="players" id="playersBox"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" id="handTitle">手牌</div>
+        <div class="hand" id="handBox"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">操作</div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btnConfirm">确认成词</button>
+          <button class="btn btn-ink" id="btnPass">跳过</button>
+          <button class="btn btn-ghost" id="btnUndo" style="border-color:var(--line);color:var(--ink)">撤销本轮</button>
+          <button class="btn btn-ghost" id="btnRack" title="点击选中一张牌单独更换；按住 Shift 可多选；未选中时更换整手牌" style="border-color:var(--line);color:var(--ink)">换牌</button>
+          <button class="btn btn-ghost span2" id="btnBestHint" style="border-color:var(--gold);color:var(--ink)">提示最高分</button>
+        </div>
+        <div style="height:12px"></div>
+        <div class="switch-row">
+          <span>宽松模式（不校验词库）</span>
+          <label class="switch">
+            <input type="checkbox" id="looseMode">
+            <span class="track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">落子记录</div>
+        <div class="log" id="logBox"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 弹窗容器 ========== -->
+<div id="modalRoot"></div>
+<div class="toast-mask" id="toastRoot" hidden></div>
+
+<script src="./xinhua_words_pinyin.compiled.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   音格 · 拼音拼词棋  —— 原生 JS 单文件
+   规则：拼音节 → 选汉字 → 组词 → 计分（Scrabble 式棋盘）
+   ============================================================ */
+
+/* ---------- 数据：拼音部件 ---------- */
+const SM = ['b','p','m','f','d','t','n','l','g','k','h','j','q','x','zh','ch','sh','r','z','c','s','y','w'];
+const YM = ['a','o','e','i','u','ü','ai','ei','ui','ao','ou','iu','ie','üe','üan','er','an','en','in','un','ün','ang','eng','ing','ong','ua'];
+// 仅保留无法按“声母 + 韵母”拆分的整体认读音节；yi/yuan/ying 等改用普通牌组合。
+const ZT = ['zhi','chi','shi','ri','zi','ci','si'];
+
+function typeOf(label){
+  if (label === '?') return 'wild';
+  if (SM.includes(label)) return 'sm';
+  if (YM.includes(label)) return 'ym';
+  return 'zt';
+}
+function pointOf(label, type){
+  if (type === 'wild') return 0;
+  if (type === 'sm') return (label.length > 1 || ['z','c','s','r'].includes(label)) ? 2 : 1;
+  if (type === 'ym'){
+    if (['a','o','e','i','u','ü'].includes(label)) return 1;
+    if (['ai','ei','ui','ao','ou','iu','ie','üe','er'].includes(label)) return 2;
+    if (['an','en','in','un','ün'].includes(label)) return 3;
+    return 4;
+  }
+  return 3;
+}
+const TYPE_NAME = {sm:'声母', ym:'韵母', zt:'整体认读', wild:'万能'};
+function normSpell(spell){
+  // 拼音规范：j q x y 后 ü 写作 u
+  if (/^[jqxy]/.test(spell)) return spell.replace('ü','u');
+  return spell;
+}
+function stripPinyinTone(spell){
+  return spell.replace(/[āáǎà]/g,'a').replace(/[ēéěè]/g,'e').replace(/[īíǐì]/g,'i')
+    .replace(/[ōóǒò]/g,'o').replace(/[ūúǔù]/g,'u').replace(/[ǖǘǚǜ]/g,'ü').replace(/ǹ/g,'n');
+}
+
+/* ---------- 数据：同音字表（音节 → 常用字） ---------- */
+let CHAR_MAP = {
+  a:['啊','阿'], ai:['爱','矮','挨','唉','哀','碍'], an:['安','岸','按','案','暗'], ang:['昂'], ao:['奥','傲','熬','袄'],
+  ba:['八','巴','把','爸','吧','拔'], bai:['白','百','摆','败','拜'], ban:['半','办','班','板','般','版','伴','扮'],
+  bang:['帮','棒','榜','傍'], bao:['包','宝','保','报','抱','暴','薄','饱'], bei:['北','被','杯','备','背','悲','贝','倍'],
+  ben:['本','奔','笨'], beng:['崩','蹦'], bi:['比','笔','必','闭','毕','避','币','壁','臂','逼','鼻'],
+  bian:['边','变','便','遍','编','扁','辩'], biao:['表','标','彪'], bie:['别','憋'],
+  bin:['宾','滨','彬'], bing:['病','并','冰','兵','饼','丙'], bo:['波','博','播','拨','伯','泊','脖','玻'],
+  bu:['不','步','部','布','补','捕','怖'],
+  ca:['擦'], cai:['才','材','财','菜','采','彩','猜'], can:['参','餐','残','惨','灿'],
+  cang:['藏','仓','苍'], cao:['草','操','曹'], ce:['测','策','侧','册'], ceng:['层','曾'],
+  cha:['查','茶','差','察','叉','插'], chai:['拆','柴'], chan:['产','缠','铲','颤','馋'],
+  chang:['长','常','场','唱','厂','尝','畅','昌','肠'], chao:['超','朝','潮','抄','吵','炒'],
+  che:['车','彻','撤','扯'], chen:['沉','陈','晨','尘','衬'], cheng:['成','城','程','称','乘','承','诚','撑','橙','呈'],
+  chi:['吃','池','迟','持','尺','齿','斥','赤','翅'], chong:['冲','充','虫','崇','重'],
+  chou:['抽','愁','仇','绸','丑'], chu:['出','初','除','楚','处','触','厨','础','储'],
+  chuan:['穿','传','船','川','串'], chuang:['窗','床','创','闯'], chui:['吹','垂','锤'],
+  chun:['春','纯','唇','蠢'], ci:['此','次','词','辞','刺','磁','慈'], cong:['从','丛','聪','葱'],
+  cou:['凑'], cu:['粗','促','醋'], cuan:['窜','篡'], cui:['脆','翠','催'], cun:['村','存','寸'], cuo:['错','措','搓'],
+  da:['大','打','达','答','搭'], dai:['带','代','戴','袋','待','呆','贷','逮'],
+  dan:['但','单','弹','蛋','淡','胆','担','旦','诞'], dang:['当','党','档','荡','挡'],
+  dao:['到','道','刀','倒','岛','导','稻','盗'], de:['的','得','德'], deng:['等','灯','登','瞪','凳'],
+  di:['地','第','低','底','弟','帝','递','敌','滴','抵','迪'], dian:['点','电','店','典','垫','殿','颠'],
+  diao:['掉','调','吊','钓','雕'], die:['爹','跌','叠','碟'], ding:['定','顶','丁','订','盯','钉','鼎'],
+  diu:['丢'], dong:['东','动','冬','懂','洞','冻','栋'], dou:['都','斗','豆','抖','逗','兜'],
+  du:['读','度','独','毒','肚','渡','堵','赌','督'], duan:['短','段','断','端','锻'],
+  dui:['对','队','堆','兑'], dun:['顿','盾','蹲','吨','钝'], duo:['多','朵','夺','躲','舵','堕'],
+  e:['饿','额','鹅','恶','蛾','扼'], en:['恩'], er:['二','儿','耳','而','尔','饵'],
+  fa:['发','法','罚','乏','伐','阀'], fan:['反','饭','范','烦','翻','凡','返','犯','泛','贩'],
+  fang:['方','放','房','防','访','仿','纺','芳'], fei:['非','飞','费','肥','废','肺','沸'],
+  fen:['分','份','粉','奋','愤','纷','芬'], feng:['风','封','峰','疯','缝','逢','丰','蜂'],
+  fo:['佛'], fou:['否'], fu:['服','负','复','父','富','副','付','夫','福','扶','府','符','浮','附','妇','幅'],
+  gai:['该','改','盖','概','钙'], gan:['干','感','敢','赶','甘','肝','杆'],
+  gang:['刚','钢','港','岗','缸'], gao:['高','告','搞','稿','糕','膏'],
+  ge:['个','各','哥','歌','格','革','隔','葛','阁','割'], gei:['给'], gen:['跟','根'],
+  geng:['更','耕','梗','耿'], gong:['工','公','功','共','宫','攻','供','恭','弓','贡'],
+  gou:['够','狗','构','沟','购','勾'], gu:['故','古','顾','鼓','谷','股','孤','姑','骨','固','估','雇'],
+  gua:['挂','瓜','刮','寡'], guai:['怪','拐','乖'], guan:['关','管','观','官','馆','惯','冠','贯','罐'],
+  guang:['光','广','逛'], gui:['贵','归','鬼','规','柜','跪','桂','轨'], gun:['滚','棍'],
+  guo:['过','国','果','锅','裹'],
+  ha:['哈'], hai:['还','海','害','孩','咳'], han:['汉','喊','含','寒','汗','韩','憾','罕','旱'],
+  hang:['行','航','杭'], hao:['好','号','浩','毫','豪','耗','昊'],
+  he:['和','喝','合','河','何','盒','贺','荷','赫','褐'], hei:['黑'], hen:['很','恨','狠'],
+  heng:['横','衡','恒'], hong:['红','洪','宏','轰','虹','哄'],
+  hou:['后','候','厚','猴','吼'], hu:['湖','户','互','呼','虎','胡','壶','糊','忽','护','狐'],
+  hua:['花','华','画','话','化','划','滑','哗'], huai:['坏','怀','淮'],
+  huan:['换','欢','环','还','缓','患','幻'], huang:['黄','皇','慌','晃','煌','凰'],
+  hui:['会','回','挥','灰','辉','毁','惠','慧','汇','悔','绘'], hun:['混','婚','昏','浑'],
+  huo:['活','火','或','货','获','祸','伙','霍'],
+  ji:['机','几','级','极','记','计','纪','技','基','击','积','及','即','急','季','济','既','际','鸡','集','己','挤','继','寄','迹','绩','激','吉','疾','辑','籍'],
+  jia:['家','加','价','假','架','甲','佳','嘉','嫁','驾'], jian:['间','见','件','建','健','坚','检','减','简','渐','剑','肩','艰','兼','监','尖','践','键','箭','荐','鉴'],
+  jiang:['将','讲','江','奖','降','疆','僵','浆','姜','酱'],
+  jiao:['叫','教','交','角','脚','觉','较','焦','郊','娇','骄','缴','搅','胶'],
+  jie:['解','界','接','节','结','街','姐','借','阶','皆','截','劫','杰','洁','捷','竭'],
+  jin:['进','金','今','近','紧','尽','仅','斤','禁','劲','津','锦','晋','浸'],
+  jing:['经','京','精','景','静','境','竟','镜','警','敬','惊','睛','晶','井','净','颈'],
+  jiu:['就','九','久','酒','旧','救','究','纠','揪','舅'],
+  ju:['局','举','具','居','据','句','巨','距','拒','聚','菊','橘','惧','锯','剧'],
+  juan:['卷','捐','倦','娟'], jue:['决','觉','绝','角','爵','掘','倔','诀'],
+  jun:['军','均','君','菌','俊','峻'],
+  ka:['卡','咖','喀'], kai:['开','凯','慨','楷'], kan:['看','砍','坎','刊','堪'],
+  kang:['康','抗','扛','炕','慷'], kao:['靠','考','烤','拷'],
+  ke:['可','课','客','科','克','刻','棵','颗','渴','壳','咳','苛'],
+  ken:['肯','啃','恳','垦'], keng:['坑'], kong:['空','孔','恐','控'], kou:['口','扣','寇','抠'],
+  ku:['苦','库','哭','酷','裤','枯','窟'], kua:['夸','跨','垮'], kuai:['快','块','筷'],
+  kuan:['宽','款'], kuang:['狂','矿','框','筐','况'], kui:['亏','愧','溃','魁','葵'],
+  kun:['困','昆','捆'], kuo:['阔','扩','括'],
+  la:['拉','啦','辣','蜡','腊'], lai:['来','赖','莱'], lan:['蓝','兰','拦','栏','懒','烂','览','篮'],
+  lang:['浪','狼','郎','廊','朗'], lao:['老','劳','牢','捞','姥','烙'], le:['了','乐','勒'],
+  lei:['累','类','泪','雷','蕾','垒'], leng:['冷','愣','棱'],
+  li:['里','力','立','利','理','历','例','离','李','礼','丽','励','厉','粒','隶','黎','璃','梨','厘'],
+  lian:['连','联','脸','练','恋','链','廉','莲','帘','炼'], liang:['两','量','亮','良','粮','凉','梁','辆','晾'],
+  liao:['了','料','聊','疗','辽','廖'], lie:['列','烈','裂','猎','劣','咧'],
+  lin:['林','临','邻','淋','琳','鳞'], ling:['令','另','领','灵','零','铃','玲','岭','凌'],
+  liu:['六','流','留','刘','柳','溜','瘤','硫'], long:['龙','隆','笼','拢'],
+  lou:['楼','漏','搂','陋'], lu:['路','陆','录','露','鲁','炉','芦','卢','鹿','碌'],
+  lü:['绿','律','旅','虑','驴','铝'], luan:['乱','卵','峦'], lue:['略','掠'],
+  lun:['论','轮','伦','沦'], luo:['落','罗','洛','骆','萝','锣','逻'],
+  ma:['吗','妈','马','麻','骂','码'], mai:['买','卖','麦','埋','迈'],
+  man:['满','慢','漫','蛮','瞒','曼'], mang:['忙','盲','茫'],
+  mao:['毛','猫','冒','帽','贸','矛','茂','茅'], me:['么'],
+  mei:['没','美','每','妹','梅','眉','媒','煤','霉'], men:['门','们','闷'],
+  meng:['梦','猛','蒙','盟','萌'], mi:['米','迷','密','秘','蜜','谜','弥','眯'],
+  mian:['面','棉','免','眠','绵'], miao:['秒','苗','妙','庙','描','渺'],
+  mie:['灭','蔑'], min:['民','敏','闽'], ming:['明','名','命','鸣','铭','冥'],
+  mo:['摸','模','莫','默','墨','磨','魔','陌','末','漠','沫'], mou:['某','谋'],
+  mu:['目','母','木','幕','慕','墓','牧','亩','穆'],
+  na:['那','拿','哪','纳','呐','娜'], nai:['乃','奶','耐','奈'],
+  nan:['难','南','男','楠'], nao:['脑','闹','恼','挠'], ne:['呢','讷'], nei:['内','馁'], nen:['嫩'],
+  neng:['能'], ni:['你','尼','泥','逆','拟','腻'], nian:['年','念','粘','碾'],
+  niang:['娘','酿'], niao:['鸟','尿'], nie:['捏','聂','孽'], nin:['您'],
+  ning:['宁','凝','拧'], niu:['牛','扭','纽','妞'], nong:['农','弄','浓','脓'],
+  nu:['努','怒','奴','弩'], nü:['女'], nuan:['暖'], nuo:['诺','挪','懦'],
+  o:['哦','噢'], ou:['偶','欧','呕','藕'],
+  pa:['怕','爬','啪','趴'], pai:['派','排','牌','拍'], pan:['盘','盼','判','攀','畔'],
+  pang:['旁','胖','乓','庞'], pao:['跑','炮','泡','抛','袍'],
+  pei:['陪','配','培','赔','佩'], pen:['盆','喷'], peng:['朋','碰','棚','鹏','彭','膨'],
+  pi:['皮','批','匹','披','疲','脾','辟','屁'], pian:['片','篇','偏','骗'],
+  piao:['票','漂','飘','瓢'], pie:['撇','瞥'], pin:['品','拼','贫','频','聘'],
+  ping:['平','评','瓶','凭','萍','乒','屏'], po:['破','迫','坡','婆','泼','颇'],
+  pu:['普','扑','铺','葡','朴','谱','蒲'],
+  qi:['起','气','其','期','七','齐','奇','器','妻','骑','旗','企','启','弃','棋','汽','泣','乞'],
+  qia:['恰','洽','掐'], qian:['前','钱','千','签','欠','牵','浅','潜','遣','歉','铅','谦','迁'],
+  qiang:['强','墙','抢','枪','腔'], qiao:['桥','巧','敲','悄','瞧','侨','翘','俏'],
+  qie:['切','且','窃','茄'], qin:['亲','琴','勤','侵','秦','擒'],
+  qing:['情','请','清','青','轻','晴','庆','倾','氢','卿','顷'],
+  qiong:['穷','琼'], qiu:['求','球','秋','丘','囚','酋'],
+  qu:['去','区','取','曲','趣','屈','驱','渠','娶','趋'], quan:['全','权','圈','劝','拳','犬','泉'],
+  que:['却','确','缺','雀','鹊'], qun:['群','裙'],
+  ran:['然','染','燃','冉'], rang:['让','嚷','壤'], rao:['绕','饶','扰'],
+  re:['热','惹'], ren:['人','认','任','忍','仁','刃','韧'], reng:['仍','扔'], ri:['日'],
+  rong:['容','荣','融','绒','溶'], rou:['肉','柔','揉'], ru:['如','入','乳','儒','辱','汝'],
+  ruan:['软'], rui:['瑞','锐','蕊'], run:['润','闰'], ruo:['若','弱'],
+  sa:['撒','洒','萨'], sai:['赛','塞','腮'], san:['三','散','伞'], sang:['桑','丧','嗓'],
+  sao:['扫','嫂','骚'], se:['色','涩','瑟'], sen:['森'], seng:['僧'],
+  sha:['沙','杀','纱','傻','啥','刹'], shai:['晒','筛'], shan:['山','闪','善','衫','扇','珊','删','汕','擅'],
+  shang:['上','商','伤','尚','赏','晌'], shao:['少','烧','绍','稍','勺','捎','哨'],
+  she:['社','射','设','舌','舍','蛇','摄','涉','奢'],
+  shen:['什','身','深','神','甚','申','伸','审','沈','婶','慎','渗'],
+  sheng:['生','声','省','胜','圣','升','剩','绳','盛'],
+  shi:['是','时','十','事','使','世','实','石','识','式','室','市','师','施','示','史','始','士','势','视','试','失','诗','食','湿','适','誓','逝','拾','饰'],
+  shou:['手','收','受','首','守','售','授','寿','瘦','兽'],
+  shu:['书','数','术','树','属','输','舒','叔','熟','暑','鼠','述','束','殊','疏','蔬','署','薯','竖','恕'],
+  shua:['刷','耍'], shuai:['帅','摔','衰','甩'], shuan:['拴','栓','涮'],
+  shuang:['双','爽','霜'], shui:['水','谁','睡','税'], shun:['顺','瞬','吮'],
+  shuo:['说','硕','烁'], si:['四','死','思','私','丝','撕','似','寺','司','肆','饲'],
+  song:['送','松','宋','诵','颂','耸'], sou:['搜','艘','嗽'],
+  su:['素','速','诉','苏','俗','宿','塑','肃','酥'], suan:['算','酸','蒜'],
+  sui:['岁','随','虽','碎','遂','穗'], sun:['孙','损','笋'], suo:['所','锁','缩','索','梭'],
+  ta:['他','她','它','塔','踏','塌'], tai:['太','台','态','抬','胎','泰'],
+  tan:['谈','探','弹','坦','贪','滩','坛','炭','叹','毯'],
+  tang:['唐','堂','糖','汤','躺','趟','烫','塘'], tao:['讨','逃','套','桃','淘','陶','涛'],
+  te:['特'], teng:['疼','腾','藤'], ti:['题','提','体','替','踢','梯','蹄','涕'],
+  tian:['天','田','甜','填','添','舔'], tiao:['条','跳','调','挑','迢'],
+  tie:['铁','贴','帖'], ting:['听','停','厅','挺','庭','亭','艇'],
+  tong:['同','通','痛','童','统','桶','筒','铜','桐'], tou:['头','投','透','偷'],
+  tu:['图','土','突','途','涂','吐','兔','徒'], tuan:['团','湍'], tui:['推','退','腿','褪'],
+  tun:['吞','屯','臀'], tuo:['拖','托','脱','妥','拓'],
+  wa:['哇','挖','瓦','蛙','袜'], wai:['外','歪'],
+  wan:['完','万','晚','玩','弯','碗','湾','挽','顽'],
+  wang:['王','望','往','网','忘','亡','旺','汪'],
+  wei:['为','位','未','维','围','伟','危','味','微','唯','委','卫','尾','威','违','慰','畏','胃','谓','魏','伪','蔚'],
+  wen:['问','文','闻','温','稳','纹','吻','蚊'], weng:['翁','嗡'],
+  wo:['我','握','窝','卧','沃','涡'], wu:['无','五','物','务','武','屋','吴','舞','误','悟','雾','污','伍','勿','吾','呜','午','捂'],
+  xi:['西','系','希','息','习','喜','细','洗','戏','吸','席','夕','惜','析','溪','牺','袭','悉','隙','膝','稀','锡'],
+  xia:['下','夏','吓','峡','狭','霞','虾','瞎'],
+  xian:['先','现','线','县','显','险','鲜','献','闲','仙','掀','弦','陷','限','宪','贤'],
+  xiang:['想','相','向','象','响','香','乡','箱','详','享','项','湘','橡','降','巷'],
+  xiao:['小','笑','消','校','晓','销','孝','肖','效','削','萧','啸','硝','宵'],
+  xie:['写','些','谢','协','鞋','血','斜','携','泄','卸','械','胁','谐','邪','歇'],
+  xin:['心','新','信','欣','辛','薪','锌'], xing:['行','星','兴','型','形','醒','姓','幸','性','刑','杏','邢','腥'],
+  xiong:['兄','雄','胸','熊','凶'], xiu:['修','休','秀','袖','绣','嗅','羞','朽'],
+  xu:['需','须','许','序','续','徐','虚','蓄','叙','旭','绪','絮','畜'],
+  xuan:['选','宣','悬','旋','玄','炫','喧'], xue:['学','雪','血','穴'],
+  xun:['寻','训','讯','迅','巡','循','旬','询','驯'],
+  ya:['呀','压','牙','亚','芽','鸭','雅','鸦','押','涯','崖'],
+  yan:['眼','言','演','严','烟','沿','盐','颜','岩','研','宴','延','炎','掩','厌','艳','雁','焰','燕','验'],
+  yang:['样','阳','养','洋','扬','羊','央','仰','杨','痒','氧'],
+  yao:['要','药','摇','咬','邀','妖','腰','谣','遥','耀','姚','窑'],
+  ye:['也','业','夜','叶','爷','野','液','页','冶'],
+  yi:['一','以','已','意','医','易','义','议','依','衣','亿','移','益','艺','异','忆','宜','疑','遗','椅','乙','亦','疫','役','译','翼','毅','谊','抑','姨'],
+  yin:['因','音','银','引','印','隐','饮','阴','姻','吟','尹','瘾'],
+  ying:['应','英','影','营','迎','赢','硬','映','鹰','樱','蝇','盈','婴'],
+  yo:['哟'], yong:['用','永','勇','拥','涌','泳','庸','咏'],
+  you:['有','又','由','友','右','油','游','优','邮','尤','幼','犹','诱','幽','悠'],
+  yu:['于','与','语','雨','鱼','育','玉','域','余','遇','预','欲','狱','渔','宇','羽','愈','御','郁','喻','寓','裕','愚','瑜'],
+  yuan:['员','原','远','元','院','愿','园','圆','源','缘','冤','援','袁','怨','猿'],
+  yue:['月','越','乐','约','阅','悦','岳','跃','粤'],
+  yun:['运','云','允','孕','韵','晕','匀','蕴'],
+  za:['杂','砸'], zai:['在','再','载','灾','仔','宰'], zan:['咱','暂','赞','攒'],
+  zang:['脏','藏','葬'], zao:['早','造','遭','糟','枣','燥','噪','灶'],
+  ze:['则','责','择','泽'], zei:['贼'], zen:['怎'], zeng:['增','赠','憎'],
+  zha:['扎','炸','眨','渣','闸','诈'], zhai:['摘','宅','窄','债','寨'],
+  zhan:['站','战','展','占','沾','粘','斩','盏'],
+  zhang:['张','长','章','掌','涨','账','仗','胀','障','丈'],
+  zhao:['找','着','照','招','赵','召','爪','罩','兆','朝','昭'],
+  zhe:['这','着','者','折','哲','浙','遮','辙'],
+  zhen:['真','镇','阵','针','珍','震','振','枕','侦','诊','贞'],
+  zheng:['正','整','证','政','争','征','挣','蒸','睁','郑','症'],
+  zhi:['之','只','知','直','指','制','治','志','纸','至','致','支','织','职','执','值','植','止','置','智','质','汁','芝','侄','帜','秩','旨','趾'],
+  zhong:['中','种','重','众','终','钟','忠','肿','衷'],
+  zhou:['周','州','洲','粥','舟','轴','宙','昼','皱'],
+  zhu:['主','住','注','助','朱','竹','逐','煮','猪','珠','著','筑','祝','诸','柱','嘱','驻','株'],
+  zhua:['抓','爪'], zhuai:['拽'], zhuan:['转','专','赚','砖','传'],
+  zhuang:['装','庄','壮','状','撞','妆','桩'], zhui:['追','坠','锥','缀'],
+  zhun:['准','谆'], zhuo:['桌','捉','卓','拙','灼','浊','琢'],
+  zi:['子','字','自','资','紫','仔','姿','滋','姊','籽'],
+  zong:['总','宗','纵','综','粽','踪'], zou:['走','奏','揍','邹'],
+  zu:['组','足','族','祖','阻','租','卒'], zuan:['钻'], zui:['最','嘴','罪','醉'],
+  zun:['尊','遵'], zuo:['做','作','坐','左','昨','座','佐']
+};
+
+/* ---------- 数据：常用词库 ---------- */
+let WORDS = new Set([
+  '爱心','爱人','安排','安全','安静','安慰','按时','按照','奥运',
+  '爸爸','白菜','白天','百货','帮忙','帮助','榜样','傍晚','包裹','宝贵','保持','保护','保证','宝贝','报道','报纸','抱歉','杯子','北方','北京','背后','背景','被子','奔驰','奔跑','本来','本领','本人','本身','本事','本质','笨重','崩溃','鼻子','比赛','比如','彼此','笔记','毕业','避免','边防','变化','辩论','标记','标准','表达','表格','表面','表演','表扬','宾馆','冰冻','冰冷','兵力','并且','病毒','病人','播种','波浪','玻璃','脖子','博士','菠菜','博客','薄弱','不但','不断','不管','不过','不仅','不论','不满','不然','不是','不许','不要','不只','不足','部队','部分','部门','布局','步骤',
+  '材料','财产','财富','采访','彩色','菜单','参观','参加','参考','餐厅','操场','草地','草原','测验','曾经','差别','差错','茶叶','产品','产生','产业','长度','长城','长处','长江','长久','长期','长远','唱歌','超市','潮流','吵闹','车间','车辆','彻底','沉默','衬衫','成长','城市','程度','程序','吃饭','吃惊','吃亏','迟到','持续','尺度','翅膀','充分','充满','充足','冲动','冲突','崇高','重复','重新','崇拜','抽屉','仇恨','丑恶','出发','出汗','出口','出来','出门','出去','出入','出色','出生','出席','出现','出租','厨房','除非','除夕','处罚','处理','处处','处长','储备','传递','传统','窗户','窗帘','创造','春节','纯粹','纯洁','词典','词语','慈祥','聪明','从来','从前','从事','粗糙','促进','促使','村庄','存在','错误','措施',
+  '答应','打扮','达到','答案','打败','打倒','打动','打雷','打量','打破','打扰','打扫','打算','打听','打印','打仗','大巴','大臣','大胆','大地','大夫','大概','大海','大会','大家','大局','大量','大陆','大妈','大门','大脑','大气','大人','大桥','大声','大师','大事','大叔','大厅','大学','大衣','大雨','大约','呆板','代表','代价','代理','代替','带领','待遇','贷款','袋子','担心','单纯','单独','单元','担任','耽误','淡水','蛋糕','弹琴','当时','当中','党员','当前','当然','当天','当作','档案','刀片','导弹','导演','到底','到处','到达','到来','倒退','道路','道歉','得到','得意','得罪','灯光','登记','等待','等于','弟弟','地点','地方','地面','地球','地区','地铁','地图','地下','地震','地址','地质','颠倒','点头','电脑','电视','电台','电影','电子','店员','雕刻','调查','调动','掉队','东北','东部','东方','东京','东南','东西','冬天','懂事','动机','动静','动力','动脉','动物','动作','都市','斗争','豆腐','抖擞','逗留','督促','独立','独特','独自','读书','读者','肚子','堵塞','度过','度假','锻炼','堆积','队伍','对比','对待','对方','对手','对象','对于','兑换','顿时','多半','多么','多少','多数','夺冠','躲避','躲藏','堕落',
+  '恶心','恶化','儿子','耳朵','耳机','而是','而且','而已','儿童','没事',
+  '发表','发布','发达','发动','发抖','发挥','发明','发生','发现','发言','发展','罚款','法案','法官','法律','法庭','法院','翻身','翻译','烦恼','繁华','繁忙','繁荣','繁殖','反对','反而','反复','反抗','反馈','反思','反应','反映','反正','饭店','范围','贩卖','方便','方法','方面','方式','房屋','房子','防守','防御','防止','防治','妨碍','仿佛','放大','放弃','放松','放心','放学','飞跃','非常','非法','飞机','飞快','飞速','飞翔','飞行','肥料','肥皂','废话','沸腾','废除','费用','分辨','分别','分布','分寸','分担','分红','分解','分类','分离','分裂','分明','分配','分歧','分散','分析','分享','分钟','分子','奋斗','愤怒','丰富','丰收','封闭','封建','封面','疯狂','风格','风光','风景','风力','风俗','风险','峰会','蜂蜜','风筝','否定','否认','否则','夫妇','夫妻','肤色','孵化','扶持','扶贫','服从','服务','服装','浮动','符号','符合','幅度','辐射','福利','福气','抚摸','抚养','辅导','腐败','父母','父亲','付出','负担','负责','负债','妇女','附和','附近','附属','复杂','复制','富有','富裕','腹部','覆盖',
+  '改变','改革','改进','改良','改善','改造','改正','改组','盖章','概括','概念','干净','干脆','干旱','干活','干扰','干涉','干燥','赶紧','赶快','感动','感激','感觉','感慨','感冒','感情','感受','感想','感谢','敢于','干部','刚才','钢材','钢琴','高大','高度','高峰','高级','高楼','高山','高速','高兴','高原','高中','搞错','搞定','稿件','告知','告别','告诉','哥哥','歌唱','歌曲','歌手','歌颂','革命','革新','格外','隔壁','个别','个人','个体','个性','各种','各自','根本','根据','跟随','更加','更好','更换','更新','工厂','工程','工地','工夫','工会','工具','工人','工业','工资','工作','公布','公道','公共','公开','公民','公平','公司','公文','公园','公正','公众','功夫','攻击','攻克','恭喜','巩固','恭敬','供求','供应','宫殿','共同','贡献','沟通','构成','构思','构造','购买','购物','估计','姑娘','孤独','孤儿','古代','古典','古老','古人','骨干','鼓励','鼓舞','鼓掌','固定','固体','固执','顾客','故事','故乡','故意','故障','顾忌','顾问','雇佣','挂号','关闭','关键','关节','关联','关切','关心','关注','观察','观点','观光','观看','观念','观众','官兵','管理','冠军','罐头','光彩','光辉','光亮','光芒','光明','光荣','光线','广播','广大','广泛','广告','广阔','广场','归纳','规律','规模','规则','硅谷','轨道','柜台','贵重','贵族','滚动','棍棒','锅炉','国歌','国会','国家','国库','国民','国旗','国情','国土','国王','国庆','果汁','过程','过度','过分','过来','过去','过于',
+  '哈哈','孩子','海岸','海拔','海洋','害怕','害羞','含糊','含义','寒冷','汗水','航空','航天','好奇','好事','好像','号码','号召','喝酒','合并','合法','合理','合适','合作','和平','河流','荷花','核桃','黑暗','黑色','痕迹','很大','很多','很好','很快','很久','很少','很热','很小','横竖','红色','宏大','洪水','喉咙','猴子','后悔','后来','后面','后期','后退','呼喊','呼吸','忽然','忽视','狐狸','胡须','蝴蝶','湖泊','糊涂','护士','互相','花朵','花园','华丽','华侨','滑冰','滑雪','化肥','化学','画画','怀念','怀疑','坏人','欢乐','欢迎','还原','环境','缓慢','患者','黄瓜','黄昏','黄色','灰尘','灰色','恢复','辉煌','回报','回答','回避','回顾','回家','回来','回去','回忆','悔改','汇报','会场','会见','会议','会员','绘画','婚姻','浑身','混合','混乱','活动','活泼','火柴','火车','火箭','火力','火山','伙食','伙伴','或许','货币','货物','获得','获奖','祸害',
+  '机场','鸡蛋','机会','机关','机器','机械','肌肉','基本','基层','基础','基地','基金','基因','激动','激光','激烈','积极','积累','积蓄','即使','即将','急忙','急促','嫉妒','级别','极端','极其','急迫','疾病','集合','集体','集团','集中','几何','几个','计划','计较','计算','记得','记忆','记载','记者','纪录','纪律','纪念','技能','技术','季节','既然','继承','继续','寄托','寂静','加班','加工','加快','加强','加入','加速','加油','夹子','家庭','家乡','假装','价格','价值','驾驶','架子','假期','坚决','坚强','坚实','坚硬','肩膀','艰苦','艰难','监督','坚持','监狱','尖锐','简单','简短','简直','剪刀','减少','检查','检察','检讨','见面','见识','建设','建议','建筑','健康','健美','健全','渐渐','江南','将军','将来','讲述','讲究','奖金','奖励','降低','降落','降温','交换','交流','交通','交往','郊区','骄傲','焦急','角度','角落','角色','狡猾','饺子','脚步','叫喊','叫好','叫做','校对','教学','教训','教育','阶层','阶段','接触','接待','接见','接近','接受','接着','街道','节能','节目','节省','节奏','杰出','洁白','结果','结合','结婚','结论','结束','结算','竭力','姐姐','解开','解散','解释','介绍','戒备','界限','借钱','借口','金融','金色','金属','今后','今年','今日','今天','紧张','谨慎','进步','进度','进攻','进化','进口','进入','进行','进展','禁止','京剧','精彩','精力','精密','精确','精神','精致','经常','经典','经过','经济','经理','经历','经验','经营','惊人','惊喜','惊讶','景色','警察','警惕','竟然','竞争','净化','竞赛','竞选','镜子','究竟','纠纷','纠正','九月','长久','酒店','酒精','救济','救援','救灾','舅舅','居然','居住','局部','局面','局限','举办','举行','巨大','拒绝','具备','具体','距离','惧怕','聚集','捐款','决策','决定','决心','绝对','绝望','军队','军官','军事','军医','均匀','君子','俊美','峻岭',
+  '卡车','开办','开采','开车','开除','开发','开放','开会','开课','开门','开幕','开始','开水','开拓','开心','开学','开展','开支','刊登','刊物','勘探','看病','看待','看法','看见','看望','慷慨','抗拒','抗议','考察','考古','考核','考虑','考试','考验','拷贝','靠近','科技','科目','科学','科研','颗粒','可爱','可怜','可能','可怕','可是','可惜','可笑','可以','渴望','克服','刻苦','客观','客气','客厅','课本','课程','课堂','空调','空气','空前','空闲','恐怖','恐惧','恐龙','控制','口岸','口袋','口号','口腔','口头','快乐','快速','筷子','宽敞','宽度','宽容','款式','狂风','况且','矿产','矿区','矿山','矿石','框架','亏本','亏损','昆虫','捆扎','困难','扩大','扩张','括号','阔气',
+  '垃圾','拉手','喇叭','蜡烛','辣椒','来到','来回','来往','来源','蓝天','篮球','懒惰','烂泥','朗读','浪花','浪费','劳动','牢固','老实','老鼠','乐趣','乐意','冷淡','冷静','冷酷','冷却','冷清','厘米','离别','离开','礼品','礼物','里面','理发','理解','理论','理想','理由','立场','立方','立即','立刻','厉害','利弊','利润','利益','利用','例如','例外','荔枝','粒子','联合','联络','联盟','联系','联想','脸色','练习','良好','良心','粮食','两边','两点','两个','辽阔','辽宁','了解','列车','烈士','猎人','邻居','邻里','林场','临时','淋雨','灵活','玲珑','凌晨','零件','铃声','领导','领会','领土','领先','领域','溜冰','浏览','流畅','流程','流传','流动','流利','流水','流行','流氓','留学','留任','六月','龙舟','隆重','笼罩','楼房','楼上','楼下','楼梯','漏洞','露面','芦苇','录取','录音','陆地','陆军','陆续','旅馆','旅客','旅行','旅游','履行','律师','绿色','掠夺','轮船','轮廓','轮流','论述','论文','论证','落实','落选',
+  '妈妈','马虎','马路','码头','蚂蚁','骂人','埋伏','买卖','满意','满足','漫长','漫画','忙碌','盲目','芒果','茫茫','毛笔','毛病','矛盾','毛巾','茂盛','冒号','冒险','贸易','帽子','玫瑰','梅花','煤矿','眉头','媒体','煤炭','美丽','美好','美满','美妙','美术','妹妹','魅力','闷热','门口','门诊','萌芽','蒙古','猛烈','梦想','迷信','米饭','蜜蜂','密码','密切','秘密','秘书','棉花','免费','面包','面对','面粉','面积','面临','面貌','面容','面条','苗条','描绘','描写','秒针','渺小','灭亡','蔑视','民办','民兵','民歌','民间','民警','民主','民族','敏感','敏捷','明白','明亮','明明','明年','明确','明天','明显','明星','明月','命令','命名','命运','摸索','模范','模糊','模仿','模型','模样','摩托','磨损','蘑菇','魔鬼','陌生','墨水','默默','默契','母亲','母校','母子','木材','目光','目前','木头','目标','目录','牧场','牡丹','拇指','幕后','沐浴','墓碑',
+  '哪里','哪怕','哪个','那些','那样','那种','纳米','奶粉','奶奶','耐心','耐用','南方','南瓜','南海','南京','南宁','男孩','男人','男性','男子','南北','难度','难题','难过','难看','难受','难忘','脑袋','脑筋','脑子','内部','内地','内科','内容','内心','内在','内脏','能干','能力','能量','能手','能源','泥土','你们','拟定','逆风','年级','年糕','年龄','年轻','念头','鸟儿','鸟语','捏造','柠檬','宁静','凝固','牛奶','牛肉','扭动','纽约','农村','农户','农历','农民','农业','浓密','浓郁','努力','怒放','女儿','女孩','女人','女士','女性','女子','暖和','暖气','诺言','懦弱',
+  '欧洲','偶尔','偶然','偶数','偶像','呕吐','殴打','欧阳',
+  '爬山','拍摄','排队','排列','排球','牌子','派出','攀登','判断','判决','盼望','旁边','胖瘦','抛弃','跑步','跑道','泡沫','培训','培养','赔偿','佩服','配套','配方','配合','配偶','喷泉','盆地','朋友','膨胀','碰撞','批发','批判','批评','批准','皮肤','皮毛','疲惫','疲劳','啤酒','脾气','屁股','偏僻','便宜','片面','骗人','飘动','漂亮','漂流','漂浮','拼命','贫困','频繁','频率','品尝','品牌','品质','品种','平安','平常','平等','平凡','平方','平衡','平静','平均','平面','平时','平坦','平行','平原','评价','评论','屏幕','苹果','凭借','瓶子','乒乓','破坏','迫切','迫害','迫使','破产','破除','破碎','仆人','朴素','普通','瀑布','葡萄','普及','谱写','铺路',
+  '期待','期间','期刊','期限','欺骗','妻子','其实','其他','其中','奇怪','奇迹','奇特','旗袍','旗帜','起床','起点','起飞','起来','起码','起身','起源','器材','器官','器械','气温','气象','汽车','汽油','契约','恰当','恰好','洽谈','千百','千米','千万','铅笔','谦虚','签订','前方','前进','前面','前年','前期','前途','前往','前线','潜水','潜力','浅色','谴责','欠缺','歉收','强大','强盗','强调','强度','强化','强烈','强壮','墙壁','抢救','桥梁','巧妙','悄悄','敲打','乔木','巧合','峭壁','切断','切割','茄子','亲近','亲密','亲戚','亲切','亲热','亲人','亲自','侵犯','侵略','勤奋','勤劳','青春','青年','青山','清晨','清除','清楚','清洁','清理','清晰','清新','清醒','轻松','轻微','倾向','倾斜','情报','情况','情形','情绪','晴朗','请假','请教','请示','请问','庆祝','穷人','秋季','秋天','丘陵','球场','球迷','球队','求职','区别','区委','区域','曲线','曲折','驱逐','屈服','渠道','取款','取消','去年','去世','趣味','圈子','全部','全国','全会','全面','全民','全年','全球','全体','泉水','拳头','犬类','劝告','缺点','缺乏','缺口','缺少','缺席','确定','确立','确切','确认','确实','确信','群众',
+  '然后','燃烧','染色','让步','饶恕','扰乱','热爱','热带','热浪','热闹','热情','热心','人才','人格','人工','人家','人间','人口','人类','人们','人民','人生','人士','人事','人体','人物','人心','人员','人造','忍耐','忍受','认得','认识','认为','认真','任何','任命','任务','任意','任性','扔下','仍然','日报','日常','日程','日记','日期','日夜','日益','日子','荣幸','荣誉','融化','容量','容纳','容器','容易','溶化','柔和','柔软','肉类','肉食','如果','如何','如今','如同','入党','入侵','入学','软件','软弱','若干','若是','弱点',
+  '洒水','撒谎','塞车','赛场','赛跑','三月','散步','散文','散发','嗓子','丧失','扫除','色彩','森林','僧人','沙发','沙漠','沙滩','傻瓜','刹车','山川','山村','山顶','山峰','山谷','山河','山脚','山路','山脉','山区','山水','山头','山西','闪闪','善良','商场','商店','商品','商人','商业','商量','伤心','上班','上等','上海','上级','上课','上空','上面','上去','上升','上午','上下','上学','上衣','上游','上涨','稍微','勺子','少年','少女','少爷','奢侈','舌头','舍得','宿舍','设法','设计','设立','设施','社会','社区','射击','射线','涉及','涉足','摄影','申报','申请','伸出','身材','身份','身体','深厚','深刻','深入','深信','深造','神经','神秘','神奇','神圣','什么','甚至','审讯','慎重','升学','生产','生成','生存','生动','生活','生命','生气','生前','生日','生态','生物','生意','生长','声音','牲畜','绳子','省略','省心','胜负','胜利','圣诞','盛大','盛开','剩余','师傅','失败','施工','施行','湿润','诗歌','诗词','十分','十足','石头','石油','时代','时而','时候','时间','时刻','时空','时髦','时期','时时','时事','识别','实惠','实际','实践','实力','实施','实习','实现','实验','实用','实在','实质','食品','食堂','食物','食盐','使得','使命','使用','始终','士兵','世纪','世界','市场','市民','市长','示范','示威','示意','式样','事故','事件','事例','事情','事实','事物','事先','事业','逝世','试卷','视察','视线','视野','是非','是否','适当','适合','适应','适用','释放','收藏','收获','收集','收入','收拾','收音','手法','手工','手机','手术','手续','手艺','手掌','手指','守候','首都','首次','首脑','首先','首要','寿命','受到','受害','受苦','受伤','受益','授予','书店','书法','书房','书籍','书记','书架','叔叔','舒服','疏忽','蔬菜','输出','输入','输送','熟练','熟悉','暑假','署名','鼠年','属于','束缚','树木','数据','数量','数学','数字','刷新','衰弱','摔倒','率领','双边','双重','双方','双手','双休','霜冻','水产','水稻','水果','水库','水利','水路','水平','水手','水源','睡觉','睡眠','睡着','税收','顺便','顺利','顺序','瞬间','说明','硕士','丝毫','思考','思念','思索','思维','思想','私人','私心','丝线','厮杀','寺院','饲料','饲养','四川','四季','四月','四周','似乎','松树','送礼','送行','搜集','搜索','艘船','速度','苏联','宿舍','塑料','塑造','酸菜','算了','虽然','随便','随后','随时','随手','随意','随着','岁数','岁月','碎片','隧道','孙子','损坏','损失','缩短','缩小','所以','所有','所长','索取','索引','锁门',
+  '他们','她们','它们','踏实','台北','台湾','抬头','太空','太平','太阳','态度','泰山','贪婪','谈话','谈论','谈判','坦然','叹气','探望','探险','糖果','倘若','躺下','烫伤','逃跑','逃走','陶瓷','淘气','讨论','特别','特产','特长','特点','特定','特殊','特征','疼爱','腾飞','藤椅','剔除','题目','题材','体会','体力','体温','体育','体制','体重','天才','天空','天气','天然','天上','天文','天下','天真','填空','田野','甜蜜','挑选','条约','调皮','调整','挑战','铁轨','铁路','铁门','听见','听取','听众','停止','挺立','通报','通常','通过','通信','通行','通讯','通用','通知','同胞','同步','同时','同事','同学','同样','同意','同志','童年','统计','统一','痛苦','痛快','头脑','头发','投资','透明','突出','突击','突破','突然','图案','图画','图片','图书','图像','图形','土地','土豆','土壤','团结','团体','团员','推车','推出','推动','推翻','推广','推荐','推进','推举','推理','退出','退伍','退休','退学','吞噬','吞并','臀部','托付','托运','妥当','妥协','椭圆','拓宽','拓扑',
+  '挖掘','娃娃','袜子','外部','外地','外国','外汇','外交','外界','外贸','外衣','外语','弯曲','玩具','玩笑','顽强','晚点','晚会','晚年','晚上','晚餐','碗筷','万里','万一','网络','网上','网页','网站','往常','往返','往来','往往','忘记','旺盛','妄想','危机','危害','危险','威风','威力','微弱','微笑','微波','微风','微观','微小','微信','为了','为难','为止','违背','违反','围巾','围绕','唯一','唯物','维持','维护','伟大','委屈','委托','委员','尾巴','尾声','温度','温和','温暖','温柔','文件','文明','文物','文学','文艺','文章','文字','闻名','蚊子','稳定','稳当','问答','问候','问题','窝囊','我们','卧室','握手','乌鸦','乌云','污染','屋子','无比','无边','无法','无故','无辜','无奈','无情','无穷','无声','无数','无限','无效','无疑','无意','无知','武器','武术','舞蹈','侮辱','午饭','午餐','物价','物理','物体','物质','物种','误会','误解','务必','务实','物品','雾气','夕阳','西藏','西方','西瓜','吸收','吸引','牺牲','希望','习惯','习俗','席位','袭击','媳妇','喜欢','喜悦','戏曲','系列','系统','细胞','细节','细菌','细腻','细微','细心','细则','峡谷','狭隘','狭窄','下班','下车','下次','下达','下海','下降','下课','下来','下落','下面','下去','下午','下乡','下游','夏天','仙女','先锋','先后','先进','先前','先生','鲜花','鲜明','鲜艳','闲话','嫌弃','显得','显然','显示','显著','险峰','现场','现代','现金','现实','现象','现在','县城','线路','陷阱','限定','限度','限量','限制','宪法','陷害','乡村','乡下','相逢','相对','相反','相关','相互','相机','相似','相同','相信','香港','香味','香甜','详细','享受','响亮','响应','想法','想起','想象','向导','向来','向前','向日葵','向往','项链','项目','象棋','象征','橡胶','橡皮','消除','消毒','消费','消耗','消灭','消失','消息','逍遥','萧条','硝酸','销售','孝敬','小孩','小姐','小时','小说','小心','小学','小组','校长','校园','笑容','效果','效率','效力','效益','笑话','协作','邪恶','斜线','携带','写作','谢谢','泄露','泄气','卸载','心理','心灵','心情','心思','心疼','心中','欣赏','辛苦','辛勤','新年','新闻','新鲜','心爱','信封','信号','信任','信息','信心','兴奋','兴趣','星期','刑法','行动','行驶','行为','行走','形成','形容','形式','形势','形象','形状','醒来','幸好','幸运','性别','性格','性命','性能','性质','姓名','凶猛','胸怀','胸口','熊猫','休息','休闲','修养','修改','修理','虚心','虚假','需求','需要','许多','许可','序言','叙述','畜牧','宣布','宣传','宣言','悬挂','旋律','旋转','选拔','选择','炫耀','削弱','学会','学科','学历','学生','学术','学说','学习','学校','学院','学者','雪花','雪山','血液','循环','询问','巡逻','训练','迅速',
+  '压迫','压缩','压抑','押金','鸭子','牙齿','牙膏','亚洲','烟草','烟花','烟火','岩石','研究','延安','延长','延期','严肃','言论','岩石','沿海','炎热','颜色','掩盖','眼睛','眼镜','眼泪','演讲','演说','演绎','厌恶','宴会','验证','燕子','杨柳','阳光','阳台','氧气','养活','养料','养殖','样品','要求','遥远','谣言','摇摆','摇滚','摇头','药材','药店','药物','要道','要害','要紧','要么','要是','要素','钥匙','爷爷','也许','冶金','野兽','野外','业务','业余','叶子','页码','夜班','夜晚','液体','一半','一边','一点','一定','一共','一会儿','一块','一连','一律','一齐','一起','一切','一生','一时','一同','一下','一向','一些','一样','一再','一直','一致','衣服','医护','医生','医学','医院','依旧','依然','依照','遗产','遗体','遗址','疑惑','疑问','移动','移民','遗失','仪器','仪式','椅子','亿万','意见','意识','意思','意图','意外','意味','意义','意愿','意志','毅力','抑制','疫苗','音乐','阴暗','阴谋','音响','银河','银行','引用','饮食','隐藏','隐瞒','印度','印刷','印象','应该','英俊','英雄','英语','营养','营业','迎接','盈利','影片','影响','影子','硬度','硬件','拥护','拥挤','拥有','永恒','勇敢','勇气','勇士','勇于','游泳','涌现','踊跃','用功','用户','用力','用品','用途','优美','优势','优先','优秀','优异','优越','忧愁','忧虑','犹豫','尤其','由此','由于','邮电','邮件','油田','游戏','友好','友情','友谊','有益','有关','有机','有力','有名','有趣','有时','有限','有效','有些','有意','右边','幼稚','娱乐','愉快','渔民','于是','舆论','渔业','愚蠢','宇宙','羽毛','雨水','语言','语音','玉米','欲望','遇到','遇见','冤枉','元旦','元件','元帅','原来','原理','原谅','原料','原始','原因','原有','原则','原子','圆满','圆桌','援助','缘分','源头','远方','远大','愿望','愿意','院子','约定','约束','乐器','乐曲','月亮','月饼','阅览','阅读','越发','越来越','越野','云彩','云雾','允许','运动','运费','运输','运算','运行','运用','运气','蕴藏',
+  '杂草','灾害','灾难','栽种','再见','再三','在乎','在家','在线','暂时','赞成','赞美','赞赏','糟糕','早晨','早饭','早上','遭受','遭遇','造句','责备','责任','怎么','增加','增长','憎恨','赠送','炸弹','诈骗','斋戒','摘要','窄小','债务','沾光','粘贴','崭新','展览','展示','展望','战争','站岗','站立','站长','掌握','涨价','丈夫','帐篷','障碍','招待','招聘','朝气','朝阳','着急','着火','着凉','沼泽','照片','照样','照耀','折合','哲学','这里','这么','这儿','这些','这样','这种','浙江','珍贵','珍珠','真心','真诚','真理','真实','真正','诊断','枕头','阵地','阵容','振奋','震惊','镇定','正月','征服','征求','争夺','争论','挣扎','睁眼','蒸发','整点','整理','整齐','整体','整天','正常','正当','正规','正面','正确','正式','正义','正在','证据','证明','政策','政府','政权','症状','支撑','支持','支出','支付','支队','知识','枝条','知道','知名','肢体','脂肪','执行','直播','直尺','直接','直线','值得','值班','职工','职能','职务','职业','植物','殖民','止步','纸张','指标','指出','指导','指点','指定','指挥','指数','指纹','指责','志气','志愿','制度','制服','制约','制造','制止','治安','治理','治疗','质量','秩序','智慧','智力','智能','中层','中国','中华','中间','中介','中立','中文','中午','中心','中型','中学','中央','中药','中医','终点','终身','钟表','衷心','种类','中毒','众多','重大','重点','重复','重庆','重新','重要','周到','周末','周年','周围','周折','周转','洲际','粥饭','轴承','昼夜','皱纹','骤然','主持','主动','主观','主角','主力','主流','主任','主席','主要','主义','主意','主张','煮饭','嘱咐','住房','住宿','住宅','助长','注册','注射','注视','注意','注重','驻守','祝福','祝贺','著名','著作','铸造','筑路','抓举','抓紧','专家','专利','专门','专题','专心','专业','专用','专政','砖头','转变','转动','转化','转换','转身','转移','转折','传记','传授','装修','庄稼','庄严','装订','装备','装饰','壮大','壮观','壮丽','状况','状态','追查','追赶','追究','追求','追问','坠落','准备','准确','准时','准许','准则','卓越','桌子','琢磨','咨询','姿势','资格','资金','资料','资源','资助','滋味','子女','紫色','字典','字母','字幕','自豪','自己','自觉','自然','自我','自学','自由','自愿','自治','自尊','宗教','宗旨','综合','总部','总裁','总和','总结','总理','总是','总数','总体','总统','纵容','走廊','走向','足球','阻拦','祖国','祖母','祖先','阻挡','组成','组合','组长','组织','钻研','钻石','嘴巴','嘴唇','最初','最大','最好','最后','最近','最终','罪恶','罪犯','罪名','尊敬','尊严','尊重','遵守','左边','左右','作业','作用','作战','作者','坐车','坐标','座位','座谈','做法','做饭','做工','做客','做梦',
+  '干燥','吉祥','智慧','因为','所以','如果','然后','而且','但是','虽然','还是','还有','已经','觉得','感觉','应该','能够','希望','喜欢','非常','特别','十分','很多','多少','所有','一些','这里','那里','刚才','马上','现在','以前','以后','最后','终于','突然','经常','常常','有时','偶尔','永远','一直','一边','一起','可能','也许','大概','几乎','大约','比较','更加','之间','其中','里面','外面','上面','下面','前面','后面','旁边','附近','周围','中间','左右','上下','东西','南北','今天','明天','昨天','将来','过去','早上','晚上','中午','下午','上午','时候','时间','分钟','小时','星期','月份','年份','春天','夏天','秋天','冬天','天气','阳光','下雨','下雪','刮风','打雷','彩虹','月亮','星星','太阳','地球','世界','国家','城市','乡村','街道','马路','汽车','火车','飞机','轮船','地铁','公交','道路','桥梁','房子','学校','医院','商店','市场','公园','广场','银行','饭店','餐厅','超市','书店','图书馆','体育场','电脑','手机','电话','电视','音乐','电影','照片','报纸','杂志','书本','笔记','考试','工作','生活','家庭','父母','哥哥','姐姐','弟弟','妹妹','爷爷','奶奶','朋友','同学','老师','学生','医生','工人','农民','警察','司机','演员','歌手','作家','画家','科学','数学','语文','英语','历史','地理','物理','化学','生物','体育','美术','颜色','红色','绿色','蓝色','白色','黑色','黄色','紫色','灰色','金色','银色','苹果','香蕉','西瓜','草莓','葡萄','橘子','柠檬','樱桃','桃子','梨子','面包','牛奶','鸡蛋','米饭','面条','饺子','包子','馒头','蛋糕','饼干','糖果','巧克力','蔬菜','白菜','土豆','萝卜','黄瓜','番茄','辣椒','茄子','蘑菇','豆角','猪肉','牛肉','羊肉','鸡肉','鱼肉','大虾','螃蟹','游泳','跑步','打球','跳绳','爬山','散步','跳舞','唱歌','画画','写字','读书','听歌','看报','做饭','睡觉','起床','洗脸','刷牙','洗澡','穿衣','打扮','出门','回家','上班','下班','休息','玩耍','比赛','运动','锻炼','身体','眼睛','耳朵','鼻子','嘴巴','牙齿','头发','手指','手掌','胳膊','肩膀','肚子','后背','腿脚','心脏','血液','大脑','神经','骨头','肌肉','皮肤','感冒','发烧','咳嗽','头疼','肚子疼','吃药','打针','手术','检查','治疗','恢复','生病','痛苦','高兴','开心','幸福','伤心','生气','愤怒','害怕','恐惧','紧张','放松','平静','安静','勇敢','坚强','温柔','善良','聪明','勤奋','懒惰','诚实','谦虚','骄傲','细心','粗心','耐心','着急','冷静','认真','努力','坚持','放弃','成功','失败','胜利','进步','落后','提高','降低','增加','减少','扩大','缩小','开始','结束','完成','继续','停止','出发','到达','回来','离开','进来','出去','上升','下降','上涨','下跌','打开','关闭','开启','保存','删除','添加','修改','编辑','复制','粘贴','剪切','移动','对比','选择','挑选','决定','判断','分析','研究','讨论','商量','交流','沟通','合作','配合','帮助','支持','反对','同意','拒绝','接受','欢迎','告别','感谢','道歉','原谅','理解','误会','解释','说明','介绍','推荐','建议','要求','请求','命令','禁止','允许','可以','不能','必须','应该','肯定','差不多','全部','部分','整个','整体','单独','共同','互相','各自','依次','轮流','同时','先后','长短','大小','多少','高低','远近','快慢','冷热','黑白','红绿','新旧','好坏','真假','对错','是非','利弊','得失','成败','胜负','输赢','进退','来去','开合','明暗','粗细','厚薄','轻重','软硬','宽窄','深浅','浓淡','早晚','春夏','秋冬','古今','中外','军民','党政'
+]);
+
+/* ---------- 棋盘奖励格（15×15，0 起始） ---------- */
+const N = 15;
+const CENTER = {r:7, c:7};
+const TW = new Set([[0,0],[0,7],[0,14],[7,0],[7,14],[14,0],[14,7],[14,14]].map(p=>p[0]+','+p[1]));
+const DW = new Set([[1,1],[2,2],[3,3],[4,4],[10,10],[11,11],[12,12],[13,13],[1,13],[2,12],[3,11],[4,10],[10,4],[11,3],[12,2],[13,1]].map(p=>p[0]+','+p[1]));
+const TL = new Set([[0,3],[0,11],[2,6],[2,8],[3,0],[3,7],[3,14],[6,2],[6,6],[6,8],[6,12],[7,3],[7,11],[8,2],[8,6],[8,8],[8,12],[11,0],[11,7],[11,14],[12,6],[12,8],[14,3],[14,11]].map(p=>p[0]+','+p[1]));
+const DL = new Set([[0,6],[0,8],[1,5],[1,9],[2,4],[2,10],[3,2],[3,12],[4,1],[4,13],[5,1],[5,5],[5,9],[5,13],[9,1],[9,5],[9,9],[9,13],[10,1],[10,13],[11,2],[11,12],[12,4],[12,10],[13,5],[13,9],[14,6],[14,8]].map(p=>p[0]+','+p[1]));
+function bonusOf(r,c){
+  const k = r+','+c;
+  if (r===CENTER.r && c===CENTER.c) return 'star';
+  if (TW.has(k)) return 'tw';
+  if (DW.has(k)) return 'dw';
+  if (TL.has(k)) return 'tl';
+  if (DL.has(k)) return 'dl';
+  return null;
+}
+const BONUS_TEXT = {dl:'双字', tl:'三字', dw:'双词', tw:'三词', star:'起'};
+
+/* ---------- 牌池 ---------- */
+let tileSeq = 0;
+function makeTile(label){
+  const type = typeOf(label);
+  return {id:tileSeq++, label, type, point:pointOf(label, type)};
+}
+function buildBag(){
+  const bag = [];
+  const add = (label, n) => { for (let i=0;i<n;i++) bag.push(makeTile(label)); };
+  ['b','p','m','f','d','t','n','l','g','k','h','y','w'].forEach(l=>add(l,4));
+  ['j','q','x','r','z','c','s'].forEach(l=>add(l,3));
+  ['zh','ch','sh'].forEach(l=>add(l,2));
+  ['a','o','e','i','u'].forEach(l=>add(l,5));
+  add('ü',2);
+  ['ai','ei','ui','ao','ou','iu','ie','üe','üan'].forEach(l=>add(l,2));
+  add('er',2);
+  ['an','en','in','un','ün'].forEach(l=>add(l,2));
+  ['ang','eng','ing','ong'].forEach(l=>add(l,2));
+  ZT.forEach(l=>add(l,2));
+  add('?',2);
+  for (let i=bag.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; }
+  return bag;
+}
+function balanceInitialHands(hands, bag){
+  const isSm = t => t.type==='sm';
+  const isSupport = t => t.type==='ym' || t.type==='zt' || t.type==='wild';
+  const count = (hand, fn) => hand.filter(fn).length;
+  // 7 张牌中尽量保持声母与可组成音节的牌接近，并保证两类各至少 2 张。
+  hands.forEach(hand=>{
+    for (let guard=0; guard<8; guard++){
+      const sm=count(hand,isSm), support=count(hand,isSupport);
+      if (sm>=2 && support>=2 && Math.abs(sm-support)<=2) break;
+      const needSm=sm<support;
+      const donor=hands.find(other=>other!==hand && count(other,needSm?isSm:isSupport)>2);
+      const donorIndex=donor?.findIndex(needSm?isSm:isSupport) ?? -1;
+      const ownIndex=hand.findIndex(needSm?isSupport:isSm);
+      if (donor && donorIndex>=0 && ownIndex>=0){
+        [hand[ownIndex],donor[donorIndex]]=[donor[donorIndex],hand[ownIndex]];
+      } else {
+        const bagIndex=bag.findIndex(needSm?isSm:isSupport);
+        if (bagIndex<0) break;
+        const own=hand.findIndex(needSm?isSupport:isSm);
+        if (own<0) break;
+        [hand[own],bag[bagIndex]]=[bag[bagIndex],hand[own]];
+      }
+    }
+  });
+  // 第一手必须由声母+韵母（或万能牌）起步，避免直接落一张整体认读牌导致开局过弱。
+  const first=hands[0];
+  const swapFromBag=(wanted, reject)=>{
+    const bagIndex=bag.findIndex(wanted);
+    const ownIndex=first.findIndex(reject);
+    if(bagIndex>=0 && ownIndex>=0) [first[ownIndex],bag[bagIndex]]=[bag[bagIndex],first[ownIndex]];
+  };
+  if(!first.some(t=>t.type==='sm')) swapFromBag(t=>t.type==='sm',t=>t.type!=='sm');
+  if(!first.some(t=>t.type==='ym'||t.type==='wild')) swapFromBag(t=>t.type==='ym'||t.type==='wild',t=>t.type!=='ym'&&t.type!=='wild');
+}
+
+/* ---------- 状态 ---------- */
+const state = {
+  players: 3,
+  names: [],
+  scores: [],
+  current: 0,
+  board: Array.from({length:N},()=>Array(N).fill(null)),
+  bag: [],
+  hands: [],
+  turnTiles: [],
+  selectedHand: null,
+  exchangeSelection: [],
+  log: [],
+  confirmedWords: [],
+  settledChars: [],
+  over: false,
+  skipStreak: 0,
+  best: 0
+};
+let looseMode = false;
+let aiMode = false;
+let aiTimer = null;
+let wordBankReady = Promise.resolve();
+let wordBankSource = '内嵌词库';
+let pickCtx = null;
+const hintCache = new Map();
+const candidateMemo = new Map();
+let bestHint = null;
+const SAVE_KEY = 'yinge-session-v1';
+
+/* ---------- 工具 ---------- */
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function toast(msg){
+  const root = $('toastRoot');
+  root.hidden = false;
+  root.innerHTML = '';
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  root.appendChild(t);
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>{ root.hidden = true; }, 2400);
+}
+function loadBest(){
+  try { state.best = parseInt(localStorage.getItem('yinge-best')||'0',10)||0; } catch(e){ state.best = 0; }
+}
+function saveBest(){
+  try { localStorage.setItem('yinge-best', String(state.best)); } catch(e){}
+}
+function charAtCell(r,c){ const d = state.board[r][c]; return d ? (d.char||'') : ''; }
+function hasSavedSession(){ try { return !!localStorage.getItem(SAVE_KEY); } catch(e){ return false; } }
+function saveSession(){
+  if(state.over || !state.names.length) return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({players:state.players,names:state.names,scores:state.scores,current:state.current,
+    board:state.board,bag:state.bag,hands:state.hands,turnTiles:state.turnTiles,exchangeSelection:state.exchangeSelection,log:state.log,confirmedWords:state.confirmedWords,settledChars:state.settledChars,
+    skipStreak:state.skipStreak,best:state.best,looseMode,aiMode})); } catch(e){}
+}
+function clearSavedSession(){ try { localStorage.removeItem(SAVE_KEY); } catch(e){} }
+function resumeSession(){
+  try {
+    const saved=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
+    if(!saved || !Number.isInteger(saved.players) || saved.players<2 || saved.players>4
+      || !Array.isArray(saved.names) || saved.names.length!==saved.players
+      || !Array.isArray(saved.scores) || saved.scores.length!==saved.players
+      || !Array.isArray(saved.board) || saved.board.length!==N || saved.board.some(row=>!Array.isArray(row)||row.length!==N)
+      || !Array.isArray(saved.bag) || !Array.isArray(saved.hands) || saved.hands.length!==saved.players) return false;
+    Object.assign(state,{players:saved.players,names:saved.names,scores:saved.scores,current:saved.current,board:saved.board,
+      bag:saved.bag,hands:saved.hands,turnTiles:saved.turnTiles||[],exchangeSelection:saved.exchangeSelection||[],log:saved.log||[],confirmedWords:saved.confirmedWords||[],settledChars:saved.settledChars||[],
+      skipStreak:saved.skipStreak||0,best:saved.best||0,over:false});
+    state.exchangeSelection=state.exchangeSelection.filter(i=>Number.isInteger(i)&&i>=0&&i<state.hands[state.current].length);
+    looseMode=!!saved.looseMode;
+    aiMode=!!saved.aiMode && saved.players===2;
+    $('aiMode').checked=aiMode;
+    const allTiles=state.bag.concat(...state.hands,...state.turnTiles);
+    tileSeq=Math.max(0,...allTiles.map(t=>t.id+1));
+    $('viewStart').hidden=true; $('viewGame').hidden=false; $('topbar').hidden=false; bestHint=null; renderAll(); return true;
+  } catch(e){ return false; }
+}
+
+/* ---------- 回合流程 ---------- */
+function startGame(players, names){
+  if(aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
+  clearSavedSession();
+  bestHint = null;
+  state.players = players;
+  state.names = names.slice(0,players);
+  if(aiMode && players===2) state.names[1]='电脑';
+  state.scores = Array(players).fill(0);
+  state.current = 0;
+  state.board = Array.from({length:N},()=>Array(N).fill(null));
+  state.bag = buildBag();
+  state.hands = Array.from({length:players},()=>[]);
+  state.turnTiles = [];
+  state.selectedHand = null;
+  state.exchangeSelection = [];
+  state.log = [];
+  state.confirmedWords = [];
+  state.settledChars = [];
+  state.over = false;
+  state.skipStreak = 0;
+  for (let p=0;p<players;p++){ for(let i=0;i<7 && state.bag.length;i++) state.hands[p].push(state.bag.pop()); }
+  balanceInitialHands(state.hands, state.bag);
+  $('viewStart').hidden = true;
+  $('viewGame').hidden = false;
+  $('topbar').hidden = false;
+  renderAll();
+  if (isAITurn()) scheduleAITurn();
+}
+function isAITurn(){ return aiMode && state.players===2 && state.current===1 && !state.over; }
+function scheduleAITurn(){
+  if(aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
+  if(!isAITurn()) return;
+  aiTimer=setTimeout(()=>{
+    aiTimer=null;
+    if(!isAITurn()) return;
+    // 电脑使用专用的小预算搜索，避免首轮或残局阻塞界面。
+    findBestHint(true);
+    if(state.turnTiles.length){
+      openPicker();
+      finalizePick();
+    } else if(state.bag.length>=7){
+      state.selectedHand=null; state.exchangeSelection=[]; rackTiles();
+    } else {
+      passTurn();
+    }
+  },300);
+}
+function renderAll(){
+  renderBoard(); renderHand(); renderPlayers(); renderLog(); renderWords(); renderTurn();
+  const aiTurn=isAITurn();
+  // 每次完整渲染都重新计算按钮状态，不能用“旧 disabled || 当前状态”。
+  // 否则电脑回合把撤销按钮置灰后，轮到玩家时它会永久保持置灰。
+  $('btnConfirm').disabled = state.turnTiles.length===0 || aiTurn;
+  $('btnPass').disabled = aiTurn;
+  $('btnUndo').disabled = state.turnTiles.length===0 || aiTurn;
+  $('btnRack').disabled = state.bag.length < 7 || !state.hands[state.current]?.length || aiTurn;
+  $('btnBestHint').disabled = state.turnTiles.length>0 || !state.hands[state.current]?.length || aiTurn;
+  $('bagCount').textContent = state.bag.length;
+  $('skipCount').textContent = state.skipStreak;
+  $('skipLimit').textContent = state.players * 2;
+  renderTurnPreview();
+  saveSession();
+}
+function currentName(){ return state.names[state.current] || ('玩家'+(state.current+1)); }
+function renderTurnPreview(){
+  const el=$('boardHint');
+  if(!el) return;
+  if(!state.turnTiles.length){
+    if(!bestHint) el.textContent='选一张手牌，再点棋盘空格落子；落完点「确认成词」';
+    return;
+  }
+  if(bestHint && bestHint.tiles?.length===state.turnTiles.length && bestHint.tiles.every(t=>state.turnTiles.some(x=>x.id===t.id&&x.r===t.r&&x.c===t.c))) return;
+  const prep=prepareRuns();
+  if(prep.err){ el.textContent='本轮落子暂不可确认：'+prep.err; return; }
+  const words=prep.allRuns.map(item=>item.syls.map(s=>s.wild?(s.wildRole==='ym'?'万能韵母':'万能声母'):s.spell).join(''));
+  let points=prep.allRuns.reduce((sum,item)=>sum+scoreRun(item.run),0);
+  const clearBonus=state.hands[state.current].length===0 ? 20 : 0;
+  points+=clearBonus;
+  el.textContent='本轮预览：'+words.join('、')+'，预计 '+points+' 分'+(clearBonus?'（含清空手牌 +20）':'')+'；确认前仍可撤销';
+}
+
+/* ---------- 棋盘渲染 ---------- */
+function renderBoard(){
+  const g = $('boardGrid');
+  g.innerHTML = '';
+  for (let r=0;r<N;r++){
+    for (let c=0;c<N;c++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.setAttribute('role','gridcell');
+      cell.setAttribute('aria-label',(r+1)+'行'+(c+1)+'列');
+      const data = state.board[r][c];
+      const placed = state.turnTiles.find(t=>t.r===r && t.c===c);
+      if (data){
+        cell.classList.add('occupied');
+        cell.dataset.rc = r+','+c;
+        const tile = document.createElement('div');
+        tile.className = 'tile tile-'+data.type;
+        if (placed){ tile.classList.add('tile-new'); cell.classList.add('newly'); }
+        tile.innerHTML = '<div class="py">'+esc(data.label)+'</div>'
+          + (data.char ? '<div class="han">'+esc(data.char)+'</div>' : '')
+          + '<div class="type-tag">'+TYPE_NAME[data.type]+'</div>';
+        cell.appendChild(tile);
+        cell.addEventListener('click', ()=> onCellClick(r,c));
+      } else {
+        const b = bonusOf(r,c);
+        if (b){
+          cell.classList.add('bonus-'+b);
+          cell.innerHTML = b==='star'
+            ? '<span class="bonus-double">起</span>'
+            : '<span class="bonus-label">'+BONUS_TEXT[b]+'</span>';
+        } else {
+          cell.classList.add('empty');
+        }
+        cell.dataset.rc = r+','+c;
+        if (placed){
+          const tile = document.createElement('div');
+          tile.className = 'tile tile-'+placed.type+' tile-new';
+          tile.innerHTML = '<div class="py">'+esc(placed.label)+'</div><div class="type-tag">'+TYPE_NAME[placed.type]+'</div>';
+          cell.appendChild(tile);
+        } else if (state.selectedHand!==null && canPlace(r,c)){
+          cell.classList.add('hint-ok');
+        }
+        cell.addEventListener('click', ()=> onCellClick(r,c));
+      }
+      if (bestHint && bestHint.tiles?.some(t=>t.r===r && t.c===c)) cell.classList.add('best-hint');
+      g.appendChild(cell);
+    }
+  }
+}
+
+/* ---------- 最高分提示 ---------- */
+function findBestHint(forAI=false){
+  if (state.over || !state.hands[state.current]?.length){ toast('当前没有可提示的手牌'); return; }
+  if (state.turnTiles.length){ toast('本轮已有提示落子，请先确认成词或撤销本轮'); return; }
+  let best = null;
+  const hand=state.hands[state.current];
+  // 使用固定节点预算而不是 Date.now() 截断，避免同一局面因电脑负载不同而给出不同结果。
+  // 残局组合爆炸时最多评估 30000 个候选，保证页面不会被长时间卡住。
+  const maxSearchSteps=forAI ? 300 : 30000;
+  let searchSteps=0;
+  const timedOut=()=>searchSteps>=maxSearchSteps;
+  const hintKey=JSON.stringify({
+    current:state.current,
+    loose:looseMode,
+    board:state.board.map(row=>row.map(cell=>cell ? [cell.label,cell.char||''] : null)),
+    hand:hand.map(t=>[t.id,t.label,t.type]).sort((a,b)=>a[0]-b[0])
+  });
+  if(hintCache.has(hintKey)){
+    const cached=hintCache.get(hintKey);
+    if(!cached){
+      $('boardHint').textContent=state.bag.length>=7
+        ? '当前手牌没有找到可完成的词语；可以点「换牌」更换手牌，或点「跳过」继续对局'
+        : '当前手牌没有找到可完成的词语；牌池少于 7 张，只能点「跳过」进入残局';
+      toast(state.bag.length>=7 ? '暂无可成词方案，可以换牌或跳过' : '暂无可成词方案，请跳过');
+      return;
+    }
+    bestHint=JSON.parse(JSON.stringify(cached));
+    const ids=new Set(bestHint.tiles.map(t=>t.id));
+    state.hands[state.current]=hand.filter(t=>!ids.has(t.id));
+    state.turnTiles=bestHint.tiles;
+    state.selectedHand=null;
+    $('boardHint').textContent='已预填最高分方案：'+bestHint.tiles.map(t=>t.label).join(' + ')+'，预计 '+bestHint.points+' 分（'+bestHint.words.join('、')+'）；可撤销或确认成词';
+    renderAll();
+    return;
+  }
+  const maxTiles=hand.length;
+  // 优先走邻位/端点剪枝；预算提高用于覆盖“横词借用已有牌组成纵词”的交叉方案。
+  const visitedSearch=new Set();
+  const evaluate=()=>{
+    if(timedOut()) return;
+    searchSteps++;
+    const prep=prepareRuns(); if (prep.err) return;
+    let points=0,words=[],choices={},ok=true;
+    for (let runIdx=0; runIdx<prep.allRuns.length; runIdx++){
+      const item=prep.allRuns[runIdx];
+      const candidates=item.syls.map(s=>{
+        if (!s.wild) return spellCandidates(s);
+        const all=[];
+        for (const label of (s.wildRole==='ym'?YM:SM)){
+          s.wildPick=label;
+          all.push(...spellCandidates(s));
+        }
+        return [...new Set(all)];
+      });
+      if(candidates.some(x=>!x.length)){ok=false;break;}
+      const chooseWord=(index,picked)=>{
+        if(index===candidates.length){
+          const word=picked.join('');
+          return looseMode || word.length<2 || WORDS.has(word) ? {word,chars:picked} : null;
+        }
+        for(const ch of candidates[index]){
+          const word=chooseWord(index+1,[...picked,ch]);
+          if(word) return word;
+        }
+        return null;
+      };
+      const result=chooseWord(0,[]);
+      if(!result){ok=false;break;}
+      points+=scoreRun(item.run); words.push(result.word);
+      result.chars.forEach((ch,si)=>{ choices[sylKey(runIdx,si)]=ch; });
+    }
+    const candidate={tiles:state.turnTiles.map(t=>({...t})),points,words,choices};
+    const signature=candidate.tiles.map(t=>t.id+'@'+t.r+','+t.c).sort().join('|')+'#'+words.join('、');
+    if(ok && (!best || points>best.points || (points===best.points && signature<best.signature))){
+      candidate.signature=signature;
+      best=candidate;
+    }
+  };
+  const search=(chosen,used)=>{
+    if(timedOut()) return;
+    const stateKey=chosen.map(t=>t.id+'@'+t.r+','+t.c).sort().join('|');
+    if(visitedSearch.has(stateKey)) return;
+    visitedSearch.add(stateKey);
+    if(chosen.length){
+      state.turnTiles=chosen;
+      evaluate();
+    }
+    if(chosen.length>=maxTiles) return;
+    // 连续直线的合法落点数量很少：首手只有中央；已有棋子时只需看邻位；
+    // 多张新牌时只看同一行/列中紧邻已有牌或本轮牌的位置，避免扫描整张棋盘。
+    const positions=[];
+    const positionKeys=new Set();
+    const addPosition=(r,c)=>{
+      if(r<0||r>=N||c<0||c>=N) return;
+      if(state.board[r][c] || chosen.some(t=>t.r===r&&t.c===c)) return;
+      const key=r+','+c;
+      if(!positionKeys.has(key)){ positionKeys.add(key); positions.push({r,c}); }
+    };
+    if(!boardHasAnyTile() && chosen.length===0){
+      addPosition(CENTER.r,CENTER.c);
+    } else if(chosen.length===0){
+      for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+        if(state.board[r][c]) continue;
+        const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+        if(dirs.some(([dr,dc])=>state.board[r+dr]?.[c+dc])){ addPosition(r,c); }
+      }
+    } else if(chosen.length===1){
+      const t=chosen[0];
+      // 第一张新牌贴住旧棋子后，第二张不一定要贴住第一张：
+      // 旧棋子可能夹在两张新牌之间，例如 新牌 + 旧牌 + 新牌。
+      // 把同一行/列中紧邻旧棋子的空格都纳入，避免提示只会单向延伸。
+      for(let c=0;c<N;c++){
+        if(state.board[t.r][c] || c===t.c) continue;
+        if(state.board[t.r][c-1] || state.board[t.r][c+1]) addPosition(t.r,c);
+      }
+      for(let r=0;r<N;r++){
+        if(state.board[r][t.c] || r===t.r) continue;
+        if(state.board[r-1]?.[t.c] || state.board[r+1]?.[t.c]) addPosition(r,t.c);
+      }
+    } else {
+      const sameRow=chosen.every(t=>t.r===chosen[0].r);
+      if(sameRow){
+        const row=chosen[0].r;
+        // 不只看新牌串的两端：已有棋子可能位于两张新牌之间，
+        // 需要允许在同一行中复用它并从另一侧继续组词。
+        for(let c=0;c<N;c++){
+          if(state.board[row][c] || chosen.some(t=>t.r===row&&t.c===c)) continue;
+          if(state.board[row][c-1] || state.board[row][c+1]
+            || chosen.some(t=>t.r===row&&Math.abs(t.c-c)===1)) addPosition(row,c);
+        }
+      } else {
+        const col=chosen[0].c;
+        for(let r=0;r<N;r++){
+          if(state.board[r][col] || chosen.some(t=>t.r===r&&t.c===col)) continue;
+          if(state.board[r-1]?.[col] || state.board[r+1]?.[col]
+            || chosen.some(t=>t.c===col&&Math.abs(t.r-r)===1)) addPosition(r,col);
+        }
+      }
+    }
+    for(let hi=0;hi<hand.length && !timedOut();hi++) if(!used.has(hi)){
+      const tile=hand[hi];
+      if(!boardHasAnyTile() && chosen.length===0 && tile.type==='zt') continue;
+      positions.forEach(pos=>{
+        if(!timedOut()) search([...chosen,{...tile,r:pos.r,c:pos.c}],new Set([...used,hi]));
+      });
+    }
+  };
+  // 首手单独枚举“中央声母 + 相邻韵母”，避免通用递归在空棋盘分支中漏掉
+  // m+ei、美 / b+ei、北 等最基本的开局方案。
+  if(!boardHasAnyTile()){
+    const around=[[CENTER.r-1,CENTER.c],[CENTER.r+1,CENTER.c],[CENTER.r,CENTER.c-1],[CENTER.r,CENTER.c+1]];
+    hand.forEach((first,fi)=>{
+      if(first.type!=='sm') return;
+      hand.forEach((second,si)=>{
+        if(fi===si || (second.type!=='ym' && second.type!=='wild')) return;
+        around.forEach(([r,c])=>{
+          state.turnTiles=[{...first,r:CENTER.r,c:CENTER.c},{...second,r,c}];
+          evaluate();
+        });
+      });
+    });
+  }
+  state.turnTiles=[];
+  // 优先完整检查“两张新牌”的方案。很多高分落子只需一组音节，
+  // 不能让前面低价值的深层组合耗尽预算而漏掉，例如 er + y + üe = 二月。
+  if(boardHasAnyTile()){
+    const anchors=[];
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      if(state.board[r][c]) continue;
+      const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+      if(dirs.some(([dr,dc])=>state.board[r+dr]?.[c+dc])){ anchors.push({r,c}); }
+    }
+    const pairPlaces=[];
+    anchors.forEach(a=>{
+      [[a.r-1,a.c],[a.r+1,a.c],[a.r,a.c-1],[a.r,a.c+1]].forEach(([r,c])=>{
+        if(r<0||r>=N||c<0||c>=N||state.board[r][c]) return;
+        pairPlaces.push([a,{r,c}]);
+      });
+    });
+    // 电脑采用确定性的 Beam Search：优先检查高倍数格和靠近已有词串的前沿，
+    // 避免残局对每个空格都重新构造完整交叉词。
+    const candidatePairPlaces=forAI
+      ? pairPlaces.sort((x,y)=>{
+          const value=p=>({tw:9,dw:6,tl:4,dl:2,star:3}[bonusOf(p.r,p.c)]||0);
+          return value(y[0])+value(y[1])-value(x[0])-value(x[1]);
+        }).slice(0,24)
+      : pairPlaces;
+    const pairCanForm=(a,b)=>{
+      if(a.type==='wild'||b.type==='wild') return true;
+      if(a.type==='sm'&&b.type==='ym') return !!CHAR_MAP[normSpell(a.label+b.label)]?.length;
+      if(a.type==='ym'&&b.type==='sm') return !!CHAR_MAP[normSpell(b.label+a.label)]?.length;
+      return false;
+    };
+    for(let i=0;i<hand.length && !timedOut();i++) for(let j=i+1;j<hand.length && !timedOut();j++){
+      const forward=pairCanForm(hand[i],hand[j]);
+      const reverse=pairCanForm(hand[j],hand[i]);
+      if(!forward && !reverse) continue;
+      for(const [a,b] of candidatePairPlaces){
+        if(timedOut()) break;
+        if(forward){
+          state.turnTiles=[{...hand[i],r:a.r,c:a.c},{...hand[j],r:b.r,c:b.c}];
+          evaluate();
+        }
+        if(reverse){
+          state.turnTiles=[{...hand[j],r:a.r,c:a.c},{...hand[i],r:b.r,c:b.c}];
+          evaluate();
+        }
+      }
+    }
+  }
+  state.turnTiles=[];
+  // 电脑首轮已有专用的“中央声母 + 相邻韵母”枚举，找到方案后不再进入通用递归。
+  // 通用递归在空棋盘上没有额外收益，却会重复构造大量无效状态。
+  if (!forAI || !best) search([],new Set());
+  // 快速覆盖“单牌借用已有牌”的情况，例如已有 q 时新增 in，可组成 qin（秦）。
+  // 这类方案不依赖多牌递归，避免被复杂交叉搜索的预算截断。
+  if (boardHasAnyTile()){
+    const anchors=[];
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      if(state.board[r][c]) continue;
+      const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+      if(dirs.some(([dr,dc])=>state.board[r+dr]?.[c+dc])){ anchors.push({r,c}); }
+    }
+    const candidateAnchors=forAI ? anchors.slice(0,24) : anchors;
+    hand.forEach(tile=>{
+      if(timedOut()) return;
+      if(tile.type==='zt') return;
+      candidateAnchors.forEach(pos=>{
+        if(timedOut()) return;
+        state.turnTiles=[{...tile,r:pos.r,c:pos.c}];
+        evaluate();
+      });
+    });
+  }
+  state.turnTiles=[];
+  if(best) delete best.signature;
+  hintCache.set(hintKey,best ? JSON.parse(JSON.stringify(best)) : null);
+  bestHint=best;
+  if (best) {
+    const ids=new Set(best.tiles.map(t=>t.id));
+    state.hands[state.current]=hand.filter(t=>!ids.has(t.id));
+    state.turnTiles=best.tiles;
+    state.selectedHand=null;
+    $('boardHint').textContent='已预填最高分方案：'+best.tiles.map(t=>t.label).join(' + ')+'，预计 '+best.points+' 分（'+best.words.join('、')+'）；可撤销或确认成词';
+  }
+  else {
+    const canExchange=state.bag.length>=7;
+    $('boardHint').textContent=canExchange
+      ? '当前手牌没有找到可完成的词语；可以点「换牌」更换手牌，或点「跳过」继续对局'
+      : '当前手牌没有找到可完成的词语；牌池少于 7 张，只能点「跳过」进入残局';
+    toast(canExchange ? '暂无可成词方案，可以换牌或跳过' : '暂无可成词方案，请跳过');
+  }
+  renderAll();
+}
+
+/* ---------- 放置合法性 ---------- */
+function boardHasAnyTile(){
+  return state.board.some(row=>row.some(v=>!!v));
+}
+function canPlace(r,c){
+  if (state.board[r][c]) return false;
+  // 仅整局第一手必须落在中央「起」格；之后只需与已有字或本轮字相邻
+  if (!boardHasAnyTile() && state.turnTiles.length===0) return (r===CENTER.r && c===CENTER.c);
+  const placed = state.turnTiles;
+  if (placed.some(t=>Math.abs(t.r-r)+Math.abs(t.c-c)===1)) return true;
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  for (const [dr,dc] of dirs){
+    const nr=r+dr, nc=c+dc;
+    if (nr>=0&&nr<N&&nc>=0&&nc<N&&state.board[nr][nc]) return true;
+  }
+  return false;
+}
+
+/* ---------- 交互：手牌与棋盘点击 ---------- */
+function onHandClick(idx,event){
+  if (state.over) return;
+  bestHint = null;
+  if(event?.shiftKey){
+    state.selectedHand=null;
+    const selected=state.exchangeSelection;
+    const pos=selected.indexOf(idx);
+    if(pos>=0) selected.splice(pos,1); else selected.push(idx);
+    renderHand();
+    return;
+  }
+  state.exchangeSelection=[];
+  state.selectedHand = (state.selectedHand===idx) ? null : idx;
+  renderBoard(); renderHand();
+}
+function onCellClick(r,c){
+  if (state.over) return;
+  bestHint = null;
+  const placedIdx = state.turnTiles.findIndex(t=>t.r===r && t.c===c);
+  if (placedIdx>=0){
+    const t = state.turnTiles.splice(placedIdx,1)[0];
+    state.hands[state.current].push(t);
+    state.selectedHand = null;
+    renderAll();
+    return;
+  }
+  if (state.board[r][c]) return;
+  if(!boardHasAnyTile() && state.turnTiles.length===0
+    && state.hands[state.current][state.selectedHand]?.type==='zt'){
+    toast('第一手不能直接使用整体认读牌，请先选择声母或韵母');
+    return;
+  }
+  if (state.selectedHand===null){ toast('先点选一张手牌'); return; }
+  if (!canPlace(r,c)){
+    toast((!boardHasAnyTile() && state.turnTiles.length===0) ? '第一手必须落在棋盘中央「起」格' : '落子必须与已有字或本轮字相邻');
+    return;
+  }
+  const tile = state.hands[state.current].splice(state.selectedHand,1)[0];
+  state.turnTiles.push({...tile, r, c});
+  state.selectedHand = null;
+  renderAll();
+}
+function undoTurn(){
+  if (!state.turnTiles.length) { toast('本轮还没有落子'); return; }
+  while (state.turnTiles.length){ state.hands[state.current].push(state.turnTiles.pop()); }
+  state.selectedHand = null;
+  bestHint = null;
+  renderAll();
+}
+function undoAllTiles(){
+  while (state.turnTiles.length){ state.hands[state.current].push(state.turnTiles.pop()); }
+}
+
+/* ---------- 音节切分 ---------- */
+// items: [{data, isNew, r, c}] 沿词方向的连续格
+function splitSyllables(items){
+  const syls = [];
+  let i = 0;
+  while (i < items.length){
+    const it = items[i], t = it.data;
+    if (t.type==='zt'){
+      syls.push({items:[it], spell:t.label, hasNew:it.isNew, wild:false});
+      i++; continue;
+    }
+    if (t.type==='sm'){
+      if (i+1 < items.length){
+        const nx = items[i+1], nt = nx.data;
+        // 连续韵母牌也可能共同组成一个复合韵母，例如 g + u + a = gua。
+        // 仅在词库中确实存在该完整音节时合并，避免误把普通的 gu + a 合成无效音节。
+        if (nt.type==='ym' && i+2 < items.length && items[i+2].data.type==='ym'){
+          const compound = t.label + nt.label + items[i+2].data.label;
+          if (CHAR_MAP[normSpell(compound)]?.length){
+            syls.push({items:[it,nx,items[i+2]], spell:compound, hasNew:it.isNew||nx.isNew||items[i+2].isNew, wild:false});
+            i+=3; continue;
+          }
+        }
+        if (nt.type==='ym'){
+          syls.push({items:[it,nx], spell:t.label+nt.label, hasNew:it.isNew||nx.isNew, wild:false});
+          i+=2; continue;
+        }
+        if (nt.type==='wild'){
+          syls.push({items:[it,nx], spell:t.label+nt.label, hasNew:true, wild:true, wildRole:'ym'});
+          i+=2; continue;
+        }
+      }
+      return null;
+    }
+    if (t.type==='ym'){
+      syls.push({items:[it], spell:t.label, hasNew:it.isNew, wild:false});
+      i++; continue;
+    }
+    if (t.type==='wild'){
+      const nx = i+1 < items.length ? items[i+1] : null;
+      if (nx && nx.data.type==='ym'){
+        syls.push({items:[it,nx], spell:nx.data.label, hasNew:true, wild:true, wildRole:'sm'});
+        i+=2; continue;
+      }
+      return null;
+    }
+  }
+  return syls;
+}
+function resolvedSpell(syl){
+  if (!syl.wild) return syl.spell;
+  const a = syl.items[0].data, b = syl.items[1].data;
+  if (syl.wildRole==='ym') return a.label + (syl.wildPick||'·');
+  return (syl.wildPick||'·') + b.label;
+}
+function spellCandidates(syl){
+  const sp = syl.wild ? resolvedSpell(syl) : normSpell(syl.spell);
+  if(!sp || sp.includes('·')) return [];
+  if(candidateMemo.has(sp)) return candidateMemo.get(sp);
+  const result=CHAR_MAP[sp] || [];
+  candidateMemo.set(sp,result);
+  return result;
+}
+
+/* ---------- 收集词串 ---------- */
+function collectRun(r,c,dir){
+  const run = [];
+  let rr=r, cc=c;
+  const dr = dir==='v' ? 1 : 0;
+  const dc = dir==='v' ? 0 : 1;
+  // 搜索提示时 collectRun 会被调用数千次；用坐标表替代每个格子反复 some/find。
+  const placedMap = new Map(state.turnTiles.map(t=>[t.r+','+t.c,t]));
+  const isFilled = (R,C)=> !!(state.board[R][C] || placedMap.has(R+','+C));
+  while (rr-dr>=0 && cc-dc>=0 && isFilled(rr-dr,cc-dc)){ rr-=dr; cc-=dc; }
+  while (rr<N && cc<N && isFilled(rr,cc)){
+    const data = state.board[rr][cc];
+    const placed = placedMap.get(rr+','+cc);
+    run.push({r:rr, c:cc, data: data || placed, isNew: !data && !!placed});
+    rr+=dr; cc+=dc;
+  }
+  return run;
+}
+function mainDirection(){
+  const first = state.turnTiles[0];
+  const allSameCol = state.turnTiles.every(t=>t.c===first.c);
+  const allSameRow = state.turnTiles.every(t=>t.r===first.r);
+  if (allSameRow && !allSameCol) return 'h';
+  if (allSameCol && !allSameRow) return 'v';
+  // 本轮只有一张牌：主词方向取与已有字相连的方向（都不相连时默认横向）
+  const hRun = collectRun(first.r, first.c, 'h');
+  const vRun = collectRun(first.r, first.c, 'v');
+  if (vRun.length >= 2 && hRun.length < 2) return 'v';
+  return 'h';
+}
+function collectMainRun(){
+  const first = state.turnTiles[0];
+  if (state.turnTiles.length === 1) return collectRun(first.r, first.c, mainDirection());
+  const allSameCol = state.turnTiles.every(t=>t.c===first.c);
+  const allSameRow = state.turnTiles.every(t=>t.r===first.r);
+  if (allSameRow) return collectRun(first.r, first.c, 'h');
+  if (allSameCol) return collectRun(first.r, first.c, 'v');
+  return null;
+}
+function collectCrossRuns(){
+  const seen = new Set();
+  const runs = [];
+  const first = state.turnTiles[0];
+  // 交叉方向与主词方向垂直
+  const crossDir = mainDirection()==='h' ? 'v' : 'h';
+  for (const t of state.turnTiles){
+    const run = collectRun(t.r, t.c, crossDir);
+    const key = crossDir + ':' + run.map(x=>x.r+','+x.c).join('|');
+    if (run.some(x=>x.isNew) && run.length>=2 && !seen.has(key)){
+      seen.add(key);
+      runs.push(run);
+    }
+  }
+  return runs;
+}
+
+/* ---------- 确认成词：打开选字弹窗 ---------- */
+function prepareRuns(){
+  const mainRun = collectMainRun();
+  if (!mainRun) return {err:'本轮落子必须连成一条直线（同一行或同一列）'};
+  const mainKeys=new Set(mainRun.map(x=>x.r+','+x.c));
+  if(!state.turnTiles.every(t=>mainKeys.has(t.r+','+t.c))) return {err:'本轮落子中间不能有空格，必须连成连续词串'};
+  const build = run => {
+    const syls = splitSyllables(run);
+    return syls ? {run, syls} : null;
+  };
+  const main = build(mainRun);
+  if (!main) return {err:'主方向音节不完整：声母后面缺少韵母'};
+  const allRuns = [{...main, kind:'main'}];
+  for (const cr of collectCrossRuns()){
+    const x = build(cr);
+    if (!x) return {err:'交叉方向音节不完整：声母后面缺少韵母'};
+    allRuns.push({...x, kind:'cross'});
+  }
+  return {allRuns};
+}
+function openPicker(){
+  const prep = prepareRuns();
+  if (prep.err){ toast(prep.err); return; }
+  // 最高分提示会把推荐汉字带进选字框；已有音节同样允许改字，
+  // 例如 shi 可以从“式”重新选成“试”，再与 k+an 组成“试看”。
+  pickCtx = { allRuns: prep.allRuns, choices: bestHint?.choices ? {...bestHint.choices} : {} };
+  renderPicker();
+}
+function sylKey(runIdx, si){ return runIdx+'-'+si; }
+function wordPreview(item, runIdx){
+  let w = '';
+  item.syls.forEach((syl, si)=>{
+    const key = sylKey(runIdx,si);
+    w += pickCtx.choices[key] || charAtCell(syl.items[0].r, syl.items[0].c) || '·';
+  });
+  return w;
+}
+function refreshPreview(){
+  const ctx = pickCtx;
+  if (!ctx) return;
+  ctx.allRuns.forEach((item, runIdx)=>{
+    const el = $('prev-'+runIdx);
+    if (el) el.textContent = (item.kind==='main'?'主词':'交叉词') + ' · ' + wordPreview(item, runIdx);
+  });
+}
+function renderPicker(){
+  const ctx = pickCtx;
+  const root = $('modalRoot');
+  let html = '<div class="modal-mask" id="pickMask"><div class="modal">';
+  html += '<h2>选定汉字</h2><div class="sub">多音字由读音锁定——本轮新组成的词，整词可重新选字（含已有字）</div>';
+  ctx.allRuns.forEach((item, runIdx)=>{
+    html += '<div class="syl-block"><div class="syl-head">'
+      + '<span style="font-size:12px;font-weight:700;color:var(--cinnabar);letter-spacing:.1em" id="prev-'+runIdx+'">'
+      + (item.kind==='main'?'主词':'交叉词') + ' · ' + wordPreview(item, runIdx) + '</span></div>';
+    item.syls.forEach((syl, si)=>{
+      const key = sylKey(runIdx, si);
+      const curChar = charAtCell(syl.items[0].r, syl.items[0].c);
+      const sp = syl.wild ? resolvedSpell(syl) : syl.spell;
+      html += '<div class="syl-block" style="margin-bottom:8px;background:var(--panel)">';
+      html += '<div class="syl-head"><span class="syl-pinyin">'+esc(sp)+'</span>'
+        + (syl.wild ? '<span class="syl-wild-tip">'+(syl.wildRole==='ym'?'万能牌充当韵母，请先选具体韵母':'万能牌充当声母，请先选具体声母')+'</span>'
+          : (!syl.hasNew ? '<span class="syl-wild-tip">已有字·可重选</span>' : '')) + '</div>';
+      if (syl.wild){
+        html += '<div class="wild-pick" id="wildpick-'+key+'">';
+        const opts = syl.wildRole==='ym' ? YM : SM;
+        opts.forEach(l=>{ html += '<button class="mini-btn" data-key="'+key+'" data-label="'+l+'">'+l+'</button>'; });
+        html += '</div>';
+        html += '<div class="char-options" id="chars-'+key+'"></div>';
+      } else {
+        const chars = spellCandidates(syl);
+        const picked = ctx.choices[key] || curChar;
+        html += '<div class="char-options" id="chars-'+key+'">';
+        if (chars.length){
+          chars.forEach(ch=>{ html += '<button class="char-opt'+(picked===ch?' on':'')+'" data-key="'+key+'" data-char="'+ch+'">'+ch+'</button>'; });
+        } else {
+          html += '<span class="syl-wild-tip">该音节暂无常用字候选，请返回调整</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  html += '<div class="modal-actions">'
+    + '<button class="btn btn-ghost" id="pickCancel" style="border-color:var(--line);color:var(--ink)">取消</button>'
+    + '<button class="btn btn-primary" id="pickConfirm">确认成词并计分</button></div>';
+  html += '</div></div>';
+  root.innerHTML = html;
+
+  root.querySelectorAll('.char-opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.key;
+      ctx.choices[key] = btn.dataset.char;
+      root.querySelectorAll('#chars-'+key+' .char-opt').forEach(b=>b.classList.toggle('on', b===btn));
+      refreshPreview();
+    });
+  });
+  root.querySelectorAll('#pickMask .mini-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.key;
+      const [ri, si] = key.split('-').map(Number);
+      const syl = ctx.allRuns[ri].syls[si];
+      syl.wildPick = btn.dataset.label;
+      root.querySelectorAll('#wildpick-'+key+' .mini-btn').forEach(b=>b.classList.toggle('on', b===btn));
+      const chars = spellCandidates(syl);
+      const box = root.querySelector('#chars-'+key);
+      box.innerHTML = '';
+      if (chars.length){
+        chars.forEach(ch=>{
+          const cb = document.createElement('button');
+          cb.className = 'char-opt';
+          cb.dataset.key = key;
+          cb.dataset.char = ch;
+          cb.textContent = ch;
+          cb.addEventListener('click', ()=>{
+            ctx.choices[key] = ch;
+            box.querySelectorAll('.char-opt').forEach(x=>x.classList.toggle('on', x===cb));
+            refreshPreview();
+          });
+          box.appendChild(cb);
+        });
+      } else {
+        box.innerHTML = '<span class="syl-wild-tip">该组合暂无常用字候选，请换一个</span>';
+      }
+      refreshPreview();
+    });
+  });
+  $('pickCancel').addEventListener('click', ()=>{ root.innerHTML=''; pickCtx=null; });
+  $('pickConfirm').addEventListener('click', finalizePick);
+  $('pickMask').addEventListener('click', e=>{ if(e.target.id==='pickMask'){ root.innerHTML=''; pickCtx=null; } });
+  refreshPreview();
+}
+
+/* ---------- 确认与计分 ---------- */
+function finalizePick(){
+  const ctx = pickCtx;
+  const missing = [];
+  ctx.allRuns.forEach((item, runIdx)=>{
+    item.syls.forEach((syl, si)=>{
+      if (syl.hasNew && !ctx.choices[sylKey(runIdx,si)]) missing.push(resolvedSpell(syl) || syl.spell);
+    });
+  });
+  if (missing.length){ toast('还有音节未选定汉字：'+missing.join('、')); return; }
+  const formed = [];
+  ctx.allRuns.forEach((item, runIdx)=>{
+    let word = '';
+    const chars = [];
+    item.syls.forEach((syl, si)=>{
+      const key = sylKey(runIdx, si);
+      const ch = ctx.choices[key] || charAtCell(syl.items[0].r, syl.items[0].c);
+      word += ch; chars.push(ch);
+    });
+    formed.push({run:item.run, word, syls:item.syls, chars});
+  });
+  const bad = formed.filter(f=>f.word.length>=2 && !looseMode && !WORDS.has(f.word)).map(f=>f.word);
+  if (bad.length){
+    const root = $('modalRoot');
+    root.innerHTML = '<div class="modal-mask"><div class="modal">'
+      + '<h2>词语不在词库中</h2>'
+      + '<div class="sub">以下词语未收录，请返回重新选词；也可以开启「宽松模式」放行</div>'
+      + '<div class="word-check-list">'+bad.map(w=>'<div class="word-check-item bad"><span class="mark bad">×</span><span class="word">'+esc(w)+'</span></div>').join('')+'</div>'
+      + '<div class="modal-actions"><button class="btn btn-primary" id="backPick" style="width:100%">返回重新选词</button></div></div></div>';
+    $('backPick').addEventListener('click', ()=>{ renderPicker(); });
+    return;
+  }
+  applyPick(formed);
+}
+function applyPick(formed){
+  // 写入棋盘：本轮组成的词整词落字——新格写入选定汉字，已有格同步更新为重选汉字
+  formed.forEach(f=>{
+    f.syls.forEach((syl, idx)=>{
+      const ch = f.chars[idx];
+      const py = normSpell(syl.wild ? (syl.wildPick || '') : syl.spell);
+      if (ch && py) {
+        const old = state.settledChars.find(x=>x.char===ch);
+        if (old) old.py = py;
+        else state.settledChars.push({char:ch, py});
+      }
+      syl.items.forEach(it=>{
+        const tileData = it.data.type==='wild' && syl.wildPick
+          ? {...it.data, label:syl.wildPick, wild:true}
+          : it.data;
+        if (it.isNew){
+          state.board[it.r][it.c] = {...tileData, char: ch};
+        } else if (state.board[it.r][it.c]){
+          state.board[it.r][it.c] = {...state.board[it.r][it.c], ...tileData, char: ch};
+        }
+      });
+    });
+  });
+  const placed = state.turnTiles;
+  let gained = 0;
+  const scoredWords = [];
+  formed.forEach(f=>{
+    const pts = scoreRun(f.run);
+    gained += pts;
+    scoredWords.push({word:f.word, pts});
+  });
+  const bonus = state.hands[state.current].length === 0 ? 20 : 0;
+  gained += bonus;
+  scoredWords.forEach(w=> state.confirmedWords.push({word:w.word, pts:w.pts}));
+  state.scores[state.current] += gained;
+  if (state.scores[state.current] > state.best){ state.best = state.scores[state.current]; saveBest(); }
+  const names = scoredWords.map(w=>w.word+'('+w.pts+'分)').join(' + ');
+  state.log.unshift({player:state.current, word:names, pts:gained, extra:bonus ? '+20 清空手牌' : ''});
+  state.turnTiles = [];
+  state.selectedHand = null;
+  bestHint = null;
+  state.skipStreak = 0;
+  while (state.hands[state.current].length < 7 && state.bag.length){
+    state.hands[state.current].push(state.bag.pop());
+  }
+  $('modalRoot').innerHTML = '';
+  pickCtx = null;
+  showScorePanel(gained, scoredWords, bonus, placed.length);
+  nextTurn();
+}
+function scoreRun(run){
+  let sum = 0, mult = 1;
+  run.forEach(cell=>{
+    let p = cell.data.point;
+    const b = bonusOf(cell.r, cell.c);
+    if (cell.isNew){
+      if (b==='dl') p *= 2;
+      if (b==='tl') p *= 3;
+      if (b==='dw') mult *= 2;
+      if (b==='tw') mult *= 3;
+      if (b==='star') mult *= 2;
+    }
+    sum += p;
+  });
+  return sum * mult;
+}
+function showScorePanel(gained, scoredWords, bonus, tileCount){
+  // 电脑的得分不再占用全屏弹窗，避免下一位玩家被上一回合的弹窗锁住。
+  // 得分仍通过 toast 展示，玩家可以立即继续落子。
+  if (isAITurn()) {
+    toast(currentName()+' 组成 '+scoredWords.map(w=>w.word).join('、')+'，得 '+gained+' 分');
+    return;
+  }
+  const root = $('modalRoot');
+  root.innerHTML = '<div class="modal-mask"><div class="modal" style="text-align:center">'
+    + '<div class="score-gain">+'+gained+' 分</div>'
+    + '<div class="sub">'+currentName()+' 组成</div>'
+    + '<div class="word-check-list" style="text-align:left">'
+    + scoredWords.map(w=>'<div class="word-check-item ok"><span class="mark ok">✓</span><span style="font-family:var(--serif);font-weight:700">'+esc(w.word)+'</span><span style="margin-left:auto;color:var(--ink-soft)">+'+w.pts+'</span></div>').join('')
+    + '</div>'
+    + (bonus?'<div class="sub" style="color:var(--cinnabar);font-weight:700">清空手牌奖励 +20</div>':'')
+    + '<button class="btn btn-primary" id="scoreClose" style="margin-top:14px;width:100%">继续</button></div></div>';
+  $('scoreClose').addEventListener('click', ()=>{
+    root.innerHTML='';
+    if (isAITurn()) scheduleAITurn();
+  });
+  // 电脑的得分提示自动停留片刻，给玩家看清本轮结果；人类回合仍由玩家手动继续。
+  if (isAITurn()) setTimeout(()=>{
+    const close=$('scoreClose');
+    if (close) close.click();
+  }, 1200);
+}
+function nextTurn(){
+  const emptyBag = state.bag.length===0;
+  if (emptyBag && state.hands[state.current].length===0){ endGame(); return; }
+  // 参考 Scrabble：每位玩家连续无得分行动两次后才结束，避免两人各跳过一次就提前结束。
+  if (state.skipStreak >= state.players * 2){ endGame(); return; }
+  state.current = (state.current + 1) % state.players;
+  // 上一位玩家（尤其是电脑）的推荐方案不能带到下一回合。
+  bestHint = null;
+  renderAll();
+  if (isAITurn() && !$('scoreClose')) scheduleAITurn();
+}
+
+/* ---------- 跳过 / 换牌 ---------- */
+function passTurn(){
+  if (state.turnTiles.length){ undoAllTiles(); }
+  bestHint = null;
+  state.skipStreak++;
+  state.log.unshift({player:state.current, word:'跳过', pts:0, extra:''});
+  nextTurn();
+}
+function rackTiles(){
+  if (state.turnTiles.length) undoAllTiles();
+  if (!state.hands[state.current].length){ toast('手里没有牌可换'); return; }
+  bestHint = null;
+  const selected = state.selectedHand;
+  const selectedMany = state.exchangeSelection.slice().sort((a,b)=>b-a);
+  const exchangingAll = selected===null && selectedMany.length===0;
+  const n = exchangingAll ? state.hands[state.current].length : (selectedMany.length || 1);
+  // 参考 Scrabble：牌池少于 7 张时进入残局，不再允许交换牌。
+  if (state.bag.length < 7){ toast('牌池少于 7 张，进入残局后不能换牌'); return; }
+  let outgoing=[];
+  if (exchangingAll) outgoing=state.hands[state.current].splice(0);
+  else if (selectedMany.length) selectedMany.forEach(index=>outgoing.push(...state.hands[state.current].splice(index,1)));
+  else outgoing=state.hands[state.current].splice(selected,1);
+  const incoming=[];
+  for (let i=0;i<n;i++) incoming.push(state.bag.pop());
+  state.hands[state.current].push(...incoming);
+  // 换出的牌回到牌池并重新洗牌，保证牌的总数和牌的身份不丢失。
+  state.bag.push(...outgoing);
+  for(let i=state.bag.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [state.bag[i],state.bag[j]]=[state.bag[j],state.bag[i]]; }
+  state.selectedHand = null;
+  state.exchangeSelection = [];
+  state.skipStreak++;
+  state.log.unshift({player:state.current, word:'换牌 ×'+n, pts:0, extra:''});
+  nextTurn();
+}
+
+/* ---------- 结束 ---------- */
+function endGame(){
+  if(aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
+  state.over = true;
+  clearSavedSession();
+  const reason = state.bag.length===0 && state.hands.some(h=>h.length===0)
+    ? '牌池已空且有玩家手牌用尽'
+    : state.skipStreak >= state.players * 2
+      ? '所有玩家连续跳过'
+      : '对局条件已满足';
+  const finalScores = state.scores.slice();
+  const finisher = state.bag.length===0 ? state.hands.findIndex(h=>h.length===0) : -1;
+  const leftovers = state.hands.map(hand=>hand.reduce((sum,t)=>sum+t.point,0));
+  if (finisher>=0){
+    const bonus=leftovers.reduce((sum,points,i)=>i===finisher?sum:sum+points,0);
+    finalScores[finisher]+=bonus;
+    leftovers.forEach((points,i)=>{ if(i!==finisher) finalScores[i]-=points; });
+  } else {
+    leftovers.forEach((points,i)=>{ finalScores[i]-=points; });
+  }
+  state.scores = finalScores;
+  const finalBest = Math.max(...finalScores, 0);
+  if (finalBest > state.best){ state.best=finalBest; saveBest(); }
+  const ranked = state.names.map((n,i)=>({name:n, score:finalScores[i]})).sort((a,b)=>b.score-a.score);
+  const root = $('modalRoot');
+  let podium = '';
+  ranked.forEach((p,i)=>{
+    podium += '<div class="end-row'+(i===0?' win':'')+'"><span class="end-rank">'+(i+1)+'</span>'
+      + '<span class="end-name">'+esc(p.name)+'</span><span class="end-score">'+p.score+' 分</span></div>';
+  });
+  root.innerHTML = '<div class="modal-mask"><div class="modal">'
+    + '<div class="end-title">对局结束</div>'
+    + '<div class="end-sub">'+esc(reason)+'</div>'
+    + '<div class="end-podium">'+podium+'</div>'
+    + '<div class="end-best">历史最高分：'+state.best+' 分</div>'
+    + '<div class="modal-actions"><button class="btn btn-ghost" id="endHome" style="border-color:var(--line);color:var(--ink)">返回首页</button>'
+    + '<button class="btn btn-primary" id="endAgain">再来一局</button></div></div></div>';
+  $('endHome').addEventListener('click', ()=>{ root.innerHTML=''; goHome(); });
+  $('endAgain').addEventListener('click', ()=>{ root.innerHTML=''; startGame(state.players, state.names); });
+}
+
+/* ---------- 侧栏渲染 ---------- */
+function renderPlayers(){
+  const box = $('playersBox');
+  box.innerHTML = '';
+  for (let i=0;i<state.players;i++){
+    const card = document.createElement('div');
+    card.className = 'player-card' + (i===state.current ? ' current' : '');
+    card.innerHTML = '<div class="player-name"><span>'+esc(state.names[i])+'</span>'
+      + (i===state.current ? '<span class="you">本回合</span>' : '')+'</div>'
+      + '<div class="player-score">'+state.scores[i]+'<small>分</small></div>';
+    box.appendChild(card);
+  }
+}
+function renderHand(){
+  $('handTitle').textContent = currentName()+' 的手牌'+(state.exchangeSelection.length?' · 已选 '+state.exchangeSelection.length+' 张换牌':'');
+  const box = $('handBox');
+  box.innerHTML = '';
+  const hand = state.hands[state.current];
+  if (!hand.length){ box.innerHTML = '<div class="hand-empty">手牌已空</div>'; return; }
+  hand.forEach((tile, i)=>{
+    const btn = document.createElement('div');
+    btn.setAttribute('role','button');
+    btn.setAttribute('tabindex','0');
+    btn.setAttribute('aria-label','手牌 '+tile.label+'，'+TYPE_NAME[tile.type]+'，'+tile.point+'分');
+    btn.className = 'hand-tile ' + tile.type + (state.selectedHand===i || state.exchangeSelection.includes(i)?' selected':'');
+    btn.innerHTML = '<div class="py">'+esc(tile.label)+'</div>'
+      + '<div class="type-tag">'+TYPE_NAME[tile.type]+'</div>'
+      + '<div class="pt">'+tile.point+'</div>';
+    btn.addEventListener('click', e=> onHandClick(i,e));
+    btn.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); onHandClick(i,e); } });
+    box.appendChild(btn);
+  });
+}
+function renderLog(){
+  const box = $('logBox');
+  if (!state.log.length){ box.innerHTML = '<div class="log-empty">还没有落子记录</div>'; return; }
+  box.innerHTML = '';
+  state.log.slice(0, 60).forEach(item=>{
+    const row = document.createElement('div');
+    row.className = 'log-item';
+    row.innerHTML = '<span class="log-turn">'+esc(state.names[item.player]||('玩家'+(item.player+1)))+'</span>'
+      + '<span class="log-word">'+esc(item.word)+'</span>'
+      + (item.pts>0?'<span class="log-points">+'+item.pts+'分</span>':'')
+      + (item.extra?'<span class="log-points">'+item.extra+'</span>':'');
+    box.appendChild(row);
+  });
+}
+function renderWords(){
+  const box = $('wordPanel');
+  if (!box) return;
+  const chars = new Map();
+  // 以落子时确认的音节为准。棋盘格里保存的是单张牌标签（如 zh / an），
+  // 不能直接当作完整拼音，否则同一个字会被拆成多个假“字”。
+  (Array.isArray(state.settledChars) && state.settledChars.length
+    ? state.settledChars
+    : state.board.flatMap(row=>row.filter(v=>v && v.char).map(v=>({char:v.char,py:''})))
+  ).forEach(v=>{
+    const key=v.char;
+    if(!chars.has(key)) chars.set(key,{char:v.char,py:v.py||''});
+  });
+  const words = state.confirmedWords;
+  let html = '';
+  html += '<div class="wp-sec-title">已落定的字</div>';
+  if (chars.size){
+    html += '<div class="wp-chars">'+[...chars.values()].map(c=>'<span class="wp-char"><span>'+esc(c.char)+'</span><span class="wp-char-py">'+esc(c.py)+'</span></span>').join('')+'</div>';
+  } else {
+    html += '<div class="wp-empty">暂无</div>';
+  }
+  html += '<div class="wp-sec-title">已组词</div>';
+  if (words.length){
+    words.slice().reverse().forEach(w=>{
+      html += '<div class="wp-word"><span class="wp-word-txt">'+esc(w.word)+'</span><span class="wp-word-pts">+'+w.pts+'</span></div>';
+    });
+  } else {
+    html += '<div class="wp-empty">暂无</div>';
+  }
+  box.innerHTML = html;
+}
+function renderTurn(){
+  $('turnText').textContent = '轮到：'+currentName();
+  $('turnDot').classList.toggle('active', !state.over);
+}
+
+/* ---------- 首页逻辑 ---------- */
+function defaultName(i){ return ['云墨','砚青','纸鸢','拾壹'][i] || ('玩家'+(i+1)); }
+function buildStartUI(){
+  const box = $('nameInputs');
+  box.innerHTML = '';
+  state._nameInputs = [];
+  for (let i=0;i<state.players;i++){
+    const wrap = document.createElement('div');
+    wrap.className = 'name-field';
+    wrap.innerHTML = '<label>玩家'+(i+1)+'</label><input maxlength="6" value="'+esc(defaultName(i))+'">';
+    box.appendChild(wrap);
+    state._nameInputs.push(wrap.querySelector('input'));
+  }
+}
+function goHome(){
+  if(aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
+  $('viewGame').hidden = true;
+  $('topbar').hidden = true;
+  $('modalRoot').innerHTML = '';
+  state.turnTiles = [];
+  state.selectedHand = null;
+  state.exchangeSelection = [];
+  bestHint = null;
+  $('viewStart').hidden = false;
+  $('btnResume').hidden = !hasSavedSession();
+}
+function openRules(){
+  const root = $('modalRoot');
+  root.innerHTML = '<div class="modal-mask"><div class="modal">'
+    + '<h2>音格 · 玩法规则</h2><div class="sub">拼音拼词棋 · 15×15 字盘 · 2–4 人</div>'
+    + '<div class="rules-text">'
+    + '<h3>目标</h3><p>在棋盘上拼出拼音音节、选定汉字并连成词语，获取最高分。</p>'
+    + '<h3>部件牌</h3><p><span class="tag" style="background:#3f6283">声母</span><span class="tag" style="background:#4e7a68">韵母</span><span class="tag" style="background:#7a5a7e">整体认读</span><span class="tag" style="background:#c9a227;color:#3a2f06">万能</span>'
+    + '声母与韵母相邻拼成一个音节；整体认读自成音节；万能牌可充当任意声母或韵母。</p>'
+    + '<h3>落子</h3><p>每轮可选一张或多张手牌放到棋盘空格；多张牌必须连成一条连续直线，并且至少连接一枚已有棋子。第一手必须覆盖中央「起」格，并且不能直接使用整体认读牌，必须从声母与韵母（或万能牌）开始组合。</p>'
+    + '<h3>选字</h3><p>每个新音节必须选定一个汉字（多音字由读音锁定——拼出什么读音，只能选该读音的字）。选定的汉字永久绑定该格。</p>'
+    + '<h3>计分</h3><p>每张牌按牌面分值计；踩「双字/三字」格该字翻倍，踩「双词/三词」格整词翻倍。一次横纵交叉同时成词可累计得分。清空全部手牌 +20 分。</p>'
+    + '<h3>无可成词时</h3><p>提示没有方案不代表对局结束。牌池至少还有 7 张牌时，可以选择一张、多张或整手换牌；也可以直接跳过。换牌和跳过都不加分，但会推进回合。牌池少于 7 张后不能换牌，只能继续落子或跳过。</p>'
+    + '<h3>人机对战</h3><p>首页选择 2 人并勾选「玩家 1 对战电脑」即可。电脑会自动选择当前局面搜索到的最高分方案；没有方案时会自动换牌或跳过。</p>'
+    + '<h3>结束</h3><p>牌池空且有人手牌用尽，或每位玩家连续两次没有有效得分行动时结束，最高分获胜。</p>'
+    + '</div>'
+    + '<div class="modal-actions"><button class="btn btn-ink" id="rulesClose" style="width:100%">知道了</button></div>'
+    + '</div></div>';
+  $('rulesClose').addEventListener('click', ()=>{ root.innerHTML=''; });
+}
+
+/* ---------- 外部词库 ---------- */
+function useCompiledWordBank(){
+  const compiled=window.XINHUA_COMPILED;
+  if(!compiled || !Array.isArray(compiled.words) || !compiled.words.length) return false;
+  WORDS=new Set(compiled.words);
+  Object.entries(compiled.chars||{}).forEach(([key,list])=>{
+    CHAR_MAP[key]=[...new Set([...(CHAR_MAP[key]||[]),...list])];
+  });
+  candidateMemo.clear();
+  hintCache.clear();
+  wordBankSource='CSV词库编译包（'+compiled.words.length.toLocaleString()+'词）';
+  return true;
+}
+async function loadWordBank(){
+  try {
+    const res = await fetch('./xinhua_words_pinyin.csv', {cache:'no-store'});
+    if (!res.ok) throw new Error('词库请求失败');
+    const text = await res.text();
+    const words = new Set();
+    const csvChars = {};
+    text.split(/\r?\n/).forEach((line, index)=>{
+      if (!line.trim() || index === 0) return;
+      // CSV 第一列为字词，兼容带引号及引号内逗号的普通格式。
+      const match = line.match(/^\s*"((?:""|[^"])*)"\s*(?:,|$)|^\s*([^,\s]+)\s*(?:,|$)/);
+      const word = (match ? (match[1] ?? match[2]) : '').replace(/""/g, '"').trim();
+      if (word) words.add(word);
+      const cols = line.match(/^\s*"((?:""|[^"])*)"\s*,\s*"((?:""|[^"])*)"\s*$/) || line.match(/^\s*([^,]+),\s*([^,]+)\s*$/);
+      if (cols && word.length===1){
+        const py = stripPinyinTone((cols[2]||'').replace(/""/g, '"').trim().toLowerCase());
+        if (py){ const key=normSpell(py); (csvChars[key] ||= []).push(word); }
+      }
+    });
+    if (words.size) WORDS = words;
+    Object.keys(csvChars).forEach(key=>{
+      const merged = [...new Set([...(CHAR_MAP[key]||[]), ...csvChars[key]])];
+      CHAR_MAP[key] = merged;
+    });
+    candidateMemo.clear();
+    hintCache.clear();
+    wordBankSource = 'CSV词库（'+words.size.toLocaleString()+'词）';
+    return true;
+  } catch (e) {
+    // file:// 页面通常禁止 fetch，改用由同一份 CSV 生成的本地编译包，
+    // 避免直接双击 HTML 时退回到不完整的内嵌词库。
+    console.warn('无法加载外部 CSV 词库，继续使用内嵌词库', e);
+    if(useCompiledWordBank()) return true;
+    wordBankSource = '内嵌词库（CSV未加载）';
+    return false;
+  }
+}
+
+/* ---------- 事件绑定 ---------- */
+window.addEventListener('beforeunload', saveSession);
+document.addEventListener('DOMContentLoaded', async ()=>{
+  loadBest();
+  $('countBtns').addEventListener('click', e=>{
+    const btn = e.target.closest('.count-btn');
+    if (!btn) return;
+    state.players = parseInt(btn.dataset.n,10);
+    if(state.players!==2){ aiMode=false; $('aiMode').checked=false; }
+    $('aiOption').hidden=state.players!==2;
+    document.querySelectorAll('#countBtns .count-btn').forEach(b=>b.classList.toggle('on', b===btn));
+    buildStartUI();
+  });
+  $('btnStart').addEventListener('click', async ()=>{
+    const startBtn=$('btnStart');
+    if (startBtn.disabled) return;
+    startBtn.disabled=true;
+    const oldText=startBtn.textContent;
+    startBtn.textContent='准备词库…';
+    await wordBankReady;
+    const names = (state._nameInputs||[]).map((inp,i) => inp.value.trim() || defaultName(i));
+    startGame(state.players, names);
+    startBtn.disabled=false;
+    startBtn.textContent=oldText;
+  });
+  $('btnConfirm').addEventListener('click', openPicker);
+  $('btnPass').addEventListener('click', passTurn);
+  $('btnUndo').addEventListener('click', undoTurn);
+  $('btnRack').addEventListener('click', rackTiles);
+  $('btnBestHint').addEventListener('click', findBestHint);
+  $('btnRulesTop').addEventListener('click', openRules);
+  $('btnHomeTop').addEventListener('click', ()=>{ $('modalRoot').innerHTML=''; goHome(); });
+  $('looseMode').addEventListener('change', e=>{ looseMode = e.target.checked; });
+  buildStartUI();
+  $('aiOption').hidden=state.players!==2;
+  $('aiMode').addEventListener('change', e=>{ aiMode=e.target.checked && state.players===2; });
+  const resume=$('btnResume');
+  resume.hidden=!hasSavedSession();
+  resume.addEventListener('click', ()=>{ if(!resumeSession()) { clearSavedSession(); resume.hidden=true; toast('上局数据已损坏，无法恢复'); } });
+  // 先完成事件绑定，再读取大词库，避免首页在 CSV 加载期间出现“点击无反应”。
+  wordBankReady=loadWordBank();
+  wordBankReady.then(()=>{
+    const status=$('bankStatus');
+    if(status) status.textContent='当前使用：'+wordBankSource;
+  });
+});
+</script>
+</body>
+</html>
